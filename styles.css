@@ -1,0 +1,39 @@
+#navbar {
+  background-color: #ffffff;
+  padding: 10px 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+}
+
+#container {
+    max-width: 100%;
+    height: 20px;
+    background-color: #faf9f9;
+    position: relative;
+
+}
+
+ul.links {
+  list-style-type: none;
+  margin-left: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  
+}
+
+ul.links li {
+    margin: 0 16px;
+}
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+}
+
+#card-display-test {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sets</title>
+    <link rel="stylesheet" href="styles.css">
+    
+</head>
+<body>
+         <nav id="navbar" class="navbar-static">
+      <div id="container">
+        <ul class="links">
+          <li><a href="TCG-home.html">Home</a></li>
+          <li><a href="TCG-sets.html">Sets</a></li>
+          <li><a href="TCG-cards.html">Cards</a></li>
+          <li><a href="TCG-collection.html">Collection</a></li>
+          <li><a href="TCG-budget.html">Budget</a></li>
+        </ul>
+        </div>
+      </nav>
+        <main>
+            <div class="container">
+              <div id="sets-button-controls">
+                <div id="sets-region-selector-container">
+                  <div id="sets-region-selector" class="button-group">
+                    <button id="sets-region-selector-international" 
+                    class="button button-active">International</button>
+                    <button id="sets-region-selector-japanese" 
+                    class="button">Japanese</button>
+                  </div>
+                 
+                </div>
+                  <div id="sets-search-controls">
+                      <div id="sets-search-form-control-container" class="form-control-container">
+                        <button type="button" class="form-control-clear-button" tabindex="-1"></button>
+                        <input type="text" id="sets-search-input" 
+                         placeholder="Search sets..." autocomplete="off" size="25" />
+                      </div>
+                          <div id="set-source-radio-container">
+                            <div id="set-source-radios">
+                              <div class="radio set-source-radio">
+                                <input type="radio" id="set-source-radio-all" 
+                                name="set-source" value="all" checked />
+                                <label for="set-source-radio-all">All</label>
+                              </div>
+                              <div class="radio set-source-radio">
+                                <input type="radio" id="set-source-radio-in-collection" 
+                                name="set-source" value="in-collection" />
+                                <label for="set-source-radio-in-collection">In Collection</label>
+                            </div>
+                              <div class="radio set-source-radio">
+                                <input type="radio" id="set-source-radio-not-in-collection" 
+                                name="set-source" value="not-in-collection" />
+                                <label for="set-source-radio-not-in-collection">Not in Collection</label>
+                              </div>
+                          </div>
+                  </div>
+                <div id="sets-search-results" class="has-sets set-sort-by-expansion-series">
+                </div>           
+          </div>
+        </main>
+</body>
+</html>
