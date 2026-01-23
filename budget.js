@@ -102,4 +102,4 @@ function updateBudgetDisplay() {
   document.getElementById('remaining-budget').textContent = `Remaining Budget: $${(totalBudget - spent).toFixed(2)}`;
   document.getElementById('total-spent').textContent = `Total Spent: $${spent.toFixed(2)}`;
 }</content>
-<parameter name="filePath">c:\Users\Mav\Projects\Pokemon TCG\budget.js
+<parameter name="filePath">c:\Users\Mav\Projects\Pokemon TCG\budget.js></parameter>

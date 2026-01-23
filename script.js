@@ -1,366 +1,95 @@
-// Instantiate the SDK
-const tcgdex = new TCGdex("en");
+// Pokemon TCG API configuration
+const POKEMON_TCG_API_KEY = "faaf3ff7-6ffe-4cf3-b89f-62442025d16f";
+const POKEMON_TCG_API_BASE = "https://api.pokemontcg.io/v2";
+const EUR_TO_USD_RATE = 0.92; // Fixed conversion rate for EUR pricing display
+const USD_TO_CAD_RATE = 1.38; // Fixed conversion rate for CAD pricing display
 
 // Global variables to store search results and current state
 let allCards = [];
 let currentPage = 1;
-let cardsPerPage = 20; // Default, can be changed by user
-let blockedCards = []; // For debugging: store blocked cards
+let cardsPerPage = 60; // Default, can be changed by user
 let setsMap = {}; // Map of set IDs to names
 
-// Example: Fetch a specific card (this runs immediately when the script loads)
-(async () => {
-  try {
-    const card = await tcgdex.fetch("cards", "swsh3-136");
-    console.log("Example card:", card.name); // "Furret"
-  } catch (error) {
-    console.error("Error fetching example card:", error);
-  }
-})();
+// Function to extract USD price from Pokemon TCG API pricing data
+function extractUSDPrice(card) {
+  if (!card || !card.tcgplayer || !card.tcgplayer.prices) return 0;
 
-// Load sets data
-(async () => {
-  try {
-    const sets = await tcgdex.fetch("sets");
-    sets.forEach((set) => {
-      setsMap[set.id] = set.name;
-    });
-    console.log("Loaded sets map:", setsMap);
-  } catch (error) {
-    console.error("Error loading sets data:", error);
+  const prices = card.tcgplayer.prices;
+
+  // Try different price variants in order of preference
+  const variants = [
+    "holofoil",
+    "reverseHolofoil",
+    "normal",
+    "1stEditionHolofoil",
+    "unlimitedHolofoil",
+    "unlimited",
+    "1stEdition",
+  ];
+
+  for (const variant of variants) {
+    if (prices[variant]?.market) {
+      return prices[variant].market;
+    }
   }
-})();
+
+  return 0;
+}
 
 // Function to search for cards based on user input
 async function searchCards() {
   try {
     // Get the user's input from the text field
-    const pokemonCard = document
-      .getElementById("pokemonCard")
-      .value.toLowerCase()
-      .trim();
+    const pokemonCard = document.getElementById("pokemonCard").value.trim();
 
-    // Use REST API for name search (empty search will return limited results)
-    const response = await fetch(
-      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(
-        pokemonCard,
-      )}`,
-    );
+    // Check if user has selected specific sets
+    const selectedSets = window.selectedSets || [];
+
+    // Build query for Pokemon TCG API
+    let query = "";
+
+    // Add set filter if sets are selected
+    if (selectedSets.length > 0) {
+      const setQuery = selectedSets
+        .map((setId) => `set.id:${setId}`)
+        .join(" OR ");
+      query = `(${setQuery})`;
+    }
+
+    // Add name filter if provided
+    if (pokemonCard) {
+      const nameQuery = `name:"*${pokemonCard}*"`;
+      query = query ? `${nameQuery} AND ${query}` : nameQuery;
+    }
+
+    console.log("Searching with query:", query);
+    console.log("Selected sets:", selectedSets);
+
+    // Fetch cards from Pokemon TCG API
+    const apiUrl = query
+      ? `${POKEMON_TCG_API_BASE}/cards?q=${encodeURIComponent(query)}&pageSize=250`
+      : `${POKEMON_TCG_API_BASE}/cards?pageSize=250`;
+
+    const response = await fetch(apiUrl);
+
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status}`);
     }
-    const cards = await response.json();
+
+    const data = await response.json();
+    const cards = data.data || [];
 
     if (cards && cards.length > 0) {
-      blockedCards = []; // Reset blocked cards
+      console.log(`Found ${cards.length} cards`);
 
-      // Fetch full card details for all cards to get complete set information
-      console.log("Fetching full details for", cards.length, "cards");
-      const fullCardPromises = cards
-        .filter((card) => card && card.id) // Only fetch cards with valid IDs
-        .map((card) =>
-          fetch(`https://api.tcgdex.net/v2/en/cards/${card.id}`)
-            .then((response) => (response.ok ? response.json() : null))
-            .catch((error) => {
-              console.error(`Error fetching card ${card.id}:`, error);
-              return null;
-            }),
-        );
-
-      const fullCards = await Promise.all(fullCardPromises);
-      const validFullCards = fullCards.filter((card) => card !== null);
-
-      console.log("Fetched", validFullCards.length, "full card details");
-
-      // Filter out digital-only cards (cards that exist only in video games/mobile apps)
-      const physicalCards = validFullCards.filter((card) => {
-        // Cards without set information get a pass (assume physical until proven otherwise)
-        if (!card.set) {
-          // But check if the card ID itself indicates TCGP
-          if (
-            card.id &&
-            (card.id.startsWith("A") ||
-              card.id.startsWith("B") ||
-              card.id.startsWith("P-"))
-          ) {
-            blockedCards.push({
-              card,
-              reason: `Card ID indicates TCGP: ${card.id}`,
-            });
-            return false;
-          }
-          console.log(`PASS: ${card.name} - no set info`);
-          return true;
-        }
-
-        // Reject cards with incomplete set info that look suspicious
-        if (!card.set.id || !card.set.name) {
-          // If it has a serie that's TCGP, block it
-          if (card.set.serie && card.set.serie.id === "tcgp") {
-            blockedCards.push({ card, reason: "TCGP serie" });
-            return false;
-          }
-          // If it has an invalid rarity, block it (likely digital)
-          if (card.rarity && !validPhysicalRarities.includes(card.rarity)) {
-            blockedCards.push({
-              card,
-              reason: `invalid rarity: ${card.rarity}`,
-            });
-            return false;
-          }
-          // Otherwise, give it a pass (assume physical until proven otherwise)
-          console.log(
-            `PASS: ${card.name} - incomplete set but no TCGP serie or invalid rarity`,
-          );
-          return true;
-        }
-
-        // PRIORITY: Check for TCGP pattern FIRST (any set starting with A, B, or P-)
-        if (
-          card.set.id &&
-          (card.set.id.startsWith("A") ||
-            card.set.id.startsWith("B") ||
-            card.set.id.startsWith("P-"))
-        ) {
-          blockedCards.push({
-            card,
-            reason: `TCGP ID pattern: ${card.set.id}`,
-          });
-          return false; // Block ALL TCGP sets
-        }
-
-        // Check for TCGP set names (catch any that might have different ID patterns)
-        const tcgpSetNames = [
-          "Genetic Apex",
-          "Mythical Island",
-          "Space-Time Smackdown",
-          "Triumphant Light",
-          "Shining Revelry",
-          "Celestial Guardians",
-          "Extradimensional Crisis",
-          "Eevee Grove",
-          "Wisdom of Sea and Sky",
-          "Secluded Springs",
-          "Mega Rising",
-          "Crimson Blaze",
-        ];
-        if (
-          card.set.name &&
-          tcgpSetNames.some((name) => card.set.name.includes(name))
-        ) {
-          blockedCards.push({
-            card,
-            reason: `TCGP set name: ${card.set.name}`,
-          });
-          return false; // Block by set name
-        }
-
-        // Check for TCGP-related keywords in set names
-        if (
-          card.set.name &&
-          (card.set.name.toLowerCase().includes("apex") ||
-            card.set.name.toLowerCase().includes("revelry") ||
-            card.set.name.toLowerCase().includes("smackdown") ||
-            card.set.name.toLowerCase().includes("celestial") ||
-            card.set.name.toLowerCase().includes("extradimensional") ||
-            card.set.name.toLowerCase().includes("mega rising") ||
-            card.set.name.toLowerCase().includes("crimson"))
-        ) {
-          blockedCards.push({
-            card,
-            reason: `TCGP keyword in set name: ${card.set.name}`,
-          });
-          return false; // Block TCGP sets by keyword
-        }
-
-        // Known digital-only series
-        const digitalSeries = ["tcgp"]; // Pokémon TCG Pocket
-
-        // Check if card is from a digital-only series
-        if (card.set.serie && digitalSeries.includes(card.set.serie.id)) {
-          blockedCards.push({
-            card,
-            reason: `digital series: ${card.set.serie.id}`,
-          });
-          return false;
-        }
-
-        // Also check for any serie that contains "pocket" or "tcg" in the name
-        if (
-          card.set.serie &&
-          (card.set.serie.name.toLowerCase().includes("pocket") ||
-            card.set.serie.name.toLowerCase().includes("tcg"))
-        ) {
-          blockedCards.push({
-            card,
-            reason: `serie name contains pocket/tcg: ${card.set.serie.name}`,
-          });
-          return false;
-        }
-
-        // Check for digital-only set names (video games/mobile apps)
-        const digitalSetNames = [
-          "Pokémon Masters",
-          "Masters EX",
-          "Trading Card Game Pocket",
-          "TCG Pocket",
-        ];
-        if (digitalSetNames.some((name) => card.set.name.includes(name))) {
-          blockedCards.push({
-            card,
-            reason: `digital set name: ${card.set.name}`,
-          });
-          return false;
-        }
-
-        // Check for promotional digital sets
-        const digitalSetIds = [
-          // fut2020 and swsh10.5 removed - these are real physical sets
-        ];
-        if (digitalSetIds.includes(card.set.id)) {
-          blockedCards.push({ card, reason: `digital set ID: ${card.set.id}` });
-          return false;
-        }
-
-        // Check for valid physical TCG rarities (ONLY allow these exact rarities)
-        const validPhysicalRarities = [
-          "Common",
-          "Uncommon",
-          "Rare",
-          "Double Rare",
-          "Ultra Rare",
-          "Shiny Ultra Rare",
-          "Illustration Rare",
-          "Special Illustration Rare",
-          "Hyper Rare",
-          "ACE SPEC",
-          "Secret Rare",
-          "Promo",
-          "Rare Holo",
-          "Classic Collection",
-          "Holo Rare VSTAR",
-          "Holo Rare VMAX",
-          "Radiant Rare",
-          "Rare Holo LV.X",
-          "Shiny Rare VMAX",
-          "Black Star Promos",
-          "Mega Hyper Rare",
-          "Holo Rare V",
-          "None",
-          "Holo Rare",
-          "Shiny Rare",
-          "Shiny Rare V",
-          "Full Art Trainer",
-          "Amazing Rare",
-          "Rare PRIME",
-          "LEGEND",
-          "ACE SPEC Rare",
-          // Include common variations
-          "common",
-          "uncommon",
-          "rare",
-          "double rare",
-          "ultra rare",
-          "shiny ultra rare",
-          "illustration rare",
-          "special illustration rare",
-          "hyper rare",
-          "ace spec",
-          "secret rare",
-          "promo",
-          "rare holo",
-          "classic collection",
-          "holo rare vstar",
-          "holo rare vmax",
-          "radiant rare",
-          "rare holo lv.x",
-          "shiny rare vmax",
-          "black star promos",
-          "mega hyper rare",
-          "holo rare v",
-          "none",
-          "holo rare",
-          "shiny rare",
-          "shiny rare v",
-          "full art trainer",
-          "amazing rare",
-          "rare prime",
-          "legend",
-          "ace spec rare",
-        ];
-
-        // STRICT: Block ANY card with invalid rarity
-        if (card.rarity) {
-          // Check for obviously digital patterns
-          if (
-            card.rarity.toLowerCase().includes("diamond") ||
-            card.rarity.includes("Four") ||
-            card.rarity.includes("Three") ||
-            card.rarity.includes("Two") ||
-            card.rarity.includes("One")
-          ) {
-            blockedCards.push({
-              card,
-              reason: `digital rarity pattern: ${card.rarity}`,
-            });
-            return false; // Block digital rarities
-          }
-
-          // Must be in valid list (case-insensitive)
-          if (
-            !validPhysicalRarities.some(
-              (validRarity) =>
-                validRarity.toLowerCase() === card.rarity.toLowerCase(),
-            )
-          ) {
-            blockedCards.push({
-              card,
-              reason: `rarity not in valid list: ${card.rarity}`,
-            });
-            return false; // Block any rarity not in the official list
-          }
-        }
-
-        // Keep physical cards
-        console.log(`PASS: ${card.name} - passed all filters`);
-        return true;
-      });
-
-      if (physicalCards.length === 0) {
-        // No physical cards found
-        allCards = [];
-        document.getElementById("controls").style.display = "none";
-        document.getElementById("pagination").style.display = "none";
-
-        let cardContainer;
-        if (document.getElementById("card-display-test")) {
-          cardContainer = document.getElementById("card-display-test");
-        } else if (document.getElementById("cards-search-results-list")) {
-          cardContainer = document.getElementById("cards-search-results-list");
-        } else {
-          cardContainer = document.getElementById("card-display-test"); // fallback
-        }
-        cardContainer.innerHTML =
-          "<p>No physical TCG cards found matching: " +
-          pokemonCard +
-          ". Only digital/video game cards were found.</p>";
-        return;
-      }
-
-      // Store filtered physical cards globally for filtering/sorting/pagination
-      allCards = physicalCards;
-
-      console.log(`Total cards after filtering: ${physicalCards.length}`);
-      console.log(`Blocked ${blockedCards.length} cards as digital`);
-
-      // Populate set filter with unique sets from results
-      populateSetFilter(allCards);
+      // Store cards globally for filtering/sorting/pagination
+      allCards = cards;
 
       // Reset to first page
       currentPage = 1;
 
       // Show controls
-      document.getElementById("controls").style.display = "block";
+      document.getElementById("card-main-controls").style.display = "block";
 
       // Add price check button if not already there
       let priceCheckBtn = document.getElementById("removeSelectedBtn");
@@ -370,50 +99,17 @@ async function searchCards() {
         priceCheckBtn.textContent = "Price Check Selected";
         priceCheckBtn.onclick = removeSelectedCards;
         priceCheckBtn.style.marginLeft = "20px";
-        document.getElementById("controls").appendChild(priceCheckBtn);
+        document
+          .getElementById("card-main-controls")
+          .appendChild(priceCheckBtn);
       }
 
       // Apply current filters and display
       await applyFilters();
-
-      // Log all found cards for debugging
-      console.log(
-        "Found physical cards:",
-        physicalCards.map((c) => ({
-          name: c.name || "Unknown",
-          id: c.id || "Unknown",
-          set: c.set?.name || "Unknown Set",
-        })),
-      );
-
-      // Display blocked cards for debugging
-      if (blockedCards.length > 0) {
-        console.log("Blocked digital cards:", blockedCards);
-        let debugContainer = document.getElementById("debug-blocked-cards");
-        if (!debugContainer) {
-          debugContainer = document.createElement("div");
-          debugContainer.id = "debug-blocked-cards";
-          debugContainer.style.border = "1px solid red";
-          debugContainer.style.padding = "10px";
-          debugContainer.style.marginTop = "20px";
-          document.body.appendChild(debugContainer);
-        }
-        debugContainer.innerHTML =
-          "<h3>Blocked Digital Cards (for debugging):</h3><ul>" +
-          blockedCards
-            .map(
-              (b) =>
-                `<li>${b.card.name} (${
-                  b.card.set?.name || "Unknown Set"
-                }) - Reason: ${b.reason}</li>`,
-            )
-            .join("") +
-          "</ul>";
-      }
     } else {
       // No cards found
       allCards = [];
-      document.getElementById("controls").style.display = "none";
+      document.getElementById("card-main-controls").style.display = "none";
       document.getElementById("pagination").style.display = "none";
 
       let cardContainer;
@@ -422,7 +118,7 @@ async function searchCards() {
       } else if (document.getElementById("cards-search-results-list")) {
         cardContainer = document.getElementById("cards-search-results-list");
       } else {
-        cardContainer = document.getElementById("card-display-test"); // fallback
+        cardContainer = document.getElementById("card-display-test");
       }
       cardContainer.innerHTML =
         "<p>No cards found matching: " + pokemonCard + "</p>";
@@ -439,87 +135,34 @@ async function applyFilters() {
 
   const sortOrder = document.getElementById("sortOrder").value;
   const currencyFilter = document.getElementById("currencyFilter").value;
-  const selectedSets = window.selectedSets || [];
 
-  // Apply set filter first
   let filteredCards = allCards;
-  if (selectedSets.length > 0) {
-    filteredCards = allCards.filter((card) => {
-      const setId = card.set?.id || card.id?.split("-")[0];
-      const setName = card.set?.name || setsMap[setId] || setId;
-      return selectedSets.includes(setName);
-    });
-  }
 
-  // Fetch full card details for ALL filtered cards to get pricing
-  const cardContainer = document.getElementById("card-display-test");
-  cardContainer.innerHTML =
-    "<p style='text-align: center;'>Loading card details...</p>";
+  console.log(`Applying filters to ${filteredCards.length} cards`);
 
-  const fullCardPromises = filteredCards
-    .filter((card) => card && card.id)
-    .map((card) =>
-      fetch(`https://api.tcgdex.net/v2/en/cards/${card.id}`)
-        .then((response) => (response.ok ? response.json() : null))
-        .catch((error) => {
-          console.error(`Error fetching card ${card.id}:`, error);
-          return null;
-        }),
-    );
-
-  const fullCards = await Promise.all(fullCardPromises);
-  const validFullCards = fullCards.filter((card) => card !== null);
-
-  // Apply sorting to ALL cards if selected
+  // Apply sorting if selected
   if (sortOrder !== "none") {
-    validFullCards.sort((a, b) => {
-      if (!a || !b) return 0;
-
-      let priceA = 0;
-      let priceB = 0;
-
-      // Always prioritize USD pricing for sorting, fall back to EUR
-      if (a.pricing?.tcgplayer?.holofoil?.marketPrice) {
-        priceA = a.pricing.tcgplayer.holofoil.marketPrice;
-      } else if (a.pricing?.cardmarket?.avg) {
-        priceA = a.pricing.cardmarket.avg;
-      }
-
-      if (b.pricing?.tcgplayer?.holofoil?.marketPrice) {
-        priceB = b.pricing.tcgplayer.holofoil.marketPrice;
-      } else if (b.pricing?.cardmarket?.avg) {
-        priceB = b.pricing.cardmarket.avg;
-      }
-
-      if (sortOrder === "high-to-low") {
-        return priceB - priceA;
-      } else {
-        return priceA - priceB;
-      }
-    });
-
-    // Log top 10 cards by price for debugging
-    console.log("Top 10 cards by price:");
-    validFullCards.slice(0, 10).forEach((card, idx) => {
-      const usdPrice = card.pricing?.tcgplayer?.holofoil?.marketPrice || 0;
-      const eurPrice = card.pricing?.cardmarket?.avg || 0;
-      const sortPrice = usdPrice || eurPrice;
-      console.log(
-        `${idx + 1}. ${card.name} (${card.id}) - $${sortPrice.toFixed(2)}`,
-      );
+    filteredCards.sort((a, b) => {
+      const priceA = extractUSDPrice(a);
+      const priceB = extractUSDPrice(b);
+      return sortOrder === "high-to-low" ? priceB - priceA : priceA - priceB;
     });
   }
 
-  // Paginate AFTER sorting all cards
+  // Paginate
   const startIndex = (currentPage - 1) * cardsPerPage;
   const endIndex = startIndex + cardsPerPage;
-  const cardsToShow = validFullCards.slice(startIndex, endIndex);
+  const cardsToDisplay = filteredCards.slice(startIndex, endIndex);
+
+  console.log(
+    `Showing cards ${startIndex + 1} to ${Math.min(endIndex, filteredCards.length)} of ${filteredCards.length}`,
+  );
 
   // Display the cards
-  displayCards(cardsToShow, currencyFilter);
+  displayCards(cardsToDisplay, currencyFilter);
 
-  // Update pagination with filtered count
-  updatePagination(validFullCards.length);
+  // Update pagination
+  updatePagination(filteredCards.length);
 }
 
 // Function to display cards
@@ -531,13 +174,13 @@ function displayCards(cards, currencyFilter) {
   } else if (document.getElementById("cards-search-results-list")) {
     cardContainer = document.getElementById("cards-search-results-list");
   } else {
-    cardContainer = document.getElementById("card-display-test"); // fallback
+    cardContainer = document.getElementById("card-display-test");
   }
 
   cardContainer.innerHTML = "";
 
-  cards.forEach((fullCard) => {
-    if (!fullCard || !fullCard.name || !fullCard.image) return;
+  cards.forEach((card) => {
+    if (!card || !card.name || !card.images) return;
 
     // Create a container for each card
     const cardDiv = document.createElement("div");
@@ -546,75 +189,74 @@ function displayCards(cards, currencyFilter) {
     cardDiv.style.margin = "10px";
     cardDiv.style.verticalAlign = "top";
 
-    // Create checkbox for removal
+    // Create checkbox for price check
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.value = fullCard.id;
+    checkbox.value = card.id;
     checkbox.className = "card-checkbox";
     checkbox.style.display = "block";
     checkbox.style.margin = "0 auto 5px auto";
 
     // Create the card image
     const cardImg = document.createElement("img");
-    cardImg.src = fullCard.image + "/high.webp";
-    cardImg.alt = fullCard.name;
+    cardImg.src = card.images.large || card.images.small;
+    cardImg.alt = card.name;
     cardImg.style.width = "200px";
     cardImg.style.display = "block";
     cardImg.style.margin = "0 auto 5px auto";
+    cardImg.style.boxShadow = "0 4px 8px rgba(0, 0, 0, 0.2)";
+    cardImg.style.border = "2px solid #FFD700";
+    cardImg.style.borderRadius = "8px";
 
     // Create card name
     const cardName = document.createElement("div");
-    cardName.textContent = fullCard.name;
+    cardName.textContent = card.name;
     cardName.style.fontSize = "14px";
     cardName.style.fontWeight = "bold";
     cardName.style.marginBottom = "5px";
+    cardName.style.color = "#fffafa";
 
     // Create pricing info
     const pricingDiv = document.createElement("div");
     pricingDiv.style.fontSize = "12px";
-    pricingDiv.style.color = "#666";
+    pricingDiv.style.color = "#eeeeee";
 
-    let pricingText = "Price: N/A";
+    const prices = [];
+    const usdPrice = extractUSDPrice(card);
 
-    if (fullCard.pricing) {
-      const prices = [];
-
-      // TCGPlayer pricing (USD)
-      if (
-        (currencyFilter === "usd" || currencyFilter === "both") &&
-        fullCard.pricing.tcgplayer &&
-        fullCard.pricing.tcgplayer.holofoil
-      ) {
-        const usdPrice = fullCard.pricing.tcgplayer.holofoil.marketPrice;
-        if (usdPrice) {
-          prices.push(`$${usdPrice.toFixed(2)} USD`);
-        }
-      }
-
-      // Cardmarket pricing (EUR)
-      if (
-        (currencyFilter === "eur" || currencyFilter === "both") &&
-        fullCard.pricing.cardmarket
-      ) {
-        const eurPrice = fullCard.pricing.cardmarket.avg;
-        if (eurPrice) {
-          prices.push(`€${eurPrice.toFixed(2)} EUR`);
-        }
-      }
-
-      if (prices.length > 0) {
-        pricingText = "Price: " + prices.join(" | ");
+    // USD Pricing
+    if (currencyFilter === "usd" || currencyFilter === "both") {
+      if (usdPrice > 0) {
+        prices.push(`$${usdPrice.toFixed(2)} USD`);
+      } else {
+        prices.push("USD: N/A");
       }
     }
+
+    // CAD Pricing (converted from USD)
+    if (currencyFilter === "cad" || currencyFilter === "both") {
+      if (usdPrice > 0) {
+        const cadPrice = usdPrice * USD_TO_CAD_RATE;
+        prices.push(`$${cadPrice.toFixed(2)} CAD`);
+      } else {
+        prices.push("CAD: N/A");
+      }
+    }
+
+    const pricingText =
+      prices.length > 0 ? "Price: " + prices.join(" | ") : "Price: N/A";
 
     pricingDiv.textContent = pricingText;
 
     // Add click event to show more details
-    cardDiv.onclick = () => {
-      console.log("Card details:", fullCard);
+    cardDiv.onclick = (e) => {
+      // Don't trigger if clicking checkbox
+      if (e.target === checkbox) return;
+
+      console.log("Card details:", card);
       alert(
-        `${fullCard.name}\nSet: ${fullCard.set.name}\nRarity: ${
-          fullCard.rarity || "N/A"
+        `${card.name}\nSet: ${card.set.name}\nNumber: ${card.number}\nRarity: ${
+          card.rarity || "N/A"
         }\n${pricingText}`,
       );
     };
@@ -634,17 +276,80 @@ function displayCards(cards, currencyFilter) {
 function updatePagination(totalCount) {
   const totalPages = Math.ceil(totalCount / cardsPerPage);
   const paginationDiv = document.getElementById("pagination");
-  const pageInfo = document.getElementById("pageInfo");
-  const prevBtn = document.getElementById("prevBtn");
-  const nextBtn = document.getElementById("nextBtn");
+  const paginationBottom = document.getElementById("pagination-bottom");
+  const pageNumbers = document.getElementById("pageNumbers");
+  const prevBtnBottom = document.getElementById("prevBtnBottom");
+  const nextBtnBottom = document.getElementById("nextBtnBottom");
 
   if (totalPages > 1) {
     paginationDiv.style.display = "block";
-    pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
-    prevBtn.disabled = currentPage === 1;
-    nextBtn.disabled = currentPage === totalPages;
+    paginationBottom.style.display = "block";
+
+    // Create clickable page numbers
+    pageNumbers.innerHTML = "";
+
+    // Show max 10 page numbers at a time
+    let startPage = Math.max(1, currentPage - 5);
+    let endPage = Math.min(totalPages, startPage + 9);
+
+    // Adjust if we're near the end
+    if (endPage - startPage < 9) {
+      startPage = Math.max(1, endPage - 9);
+    }
+
+    // Add first page and ellipsis if needed
+    if (startPage > 1) {
+      const firstBtn = document.createElement("button");
+      firstBtn.textContent = "1";
+      firstBtn.onclick = () => goToPage(1);
+      firstBtn.style.margin = "0 2px";
+      pageNumbers.appendChild(firstBtn);
+
+      if (startPage > 2) {
+        const ellipsis = document.createElement("span");
+        ellipsis.textContent = "...";
+        ellipsis.style.margin = "0 5px";
+        pageNumbers.appendChild(ellipsis);
+      }
+    }
+
+    // Add page number buttons
+    for (let i = startPage; i <= endPage; i++) {
+      const pageBtn = document.createElement("button");
+      pageBtn.textContent = i;
+      pageBtn.onclick = () => goToPage(i);
+      pageBtn.style.margin = "0 2px";
+
+      if (i === currentPage) {
+        pageBtn.style.fontWeight = "bold";
+        pageBtn.style.backgroundColor = "#2196f3";
+        pageBtn.style.color = "white";
+      }
+
+      pageNumbers.appendChild(pageBtn);
+    }
+
+    // Add ellipsis and last page if needed
+    if (endPage < totalPages) {
+      if (endPage < totalPages - 1) {
+        const ellipsis = document.createElement("span");
+        ellipsis.textContent = "...";
+        ellipsis.style.margin = "0 5px";
+        pageNumbers.appendChild(ellipsis);
+      }
+
+      const lastBtn = document.createElement("button");
+      lastBtn.textContent = totalPages;
+      lastBtn.onclick = () => goToPage(totalPages);
+      lastBtn.style.margin = "0 2px";
+      pageNumbers.appendChild(lastBtn);
+    }
+
+    prevBtnBottom.disabled = currentPage === 1;
+    nextBtnBottom.disabled = currentPage === totalPages;
   } else {
     paginationDiv.style.display = "none";
+    paginationBottom.style.display = "none";
   }
 }
 
@@ -659,7 +364,21 @@ function changePage(direction) {
   applyFilters();
 }
 
-// Function to remove selected cards
+// Function to go to specific page
+function goToPage(pageNumber) {
+  currentPage = pageNumber;
+  applyFilters();
+}
+
+// Function to scroll to top
+function scrollToTop() {
+  window.scrollTo({
+    top: 0,
+    behavior: "smooth",
+  });
+}
+
+// Function to remove selected cards (price check)
 function removeSelectedCards() {
   const checkboxes = document.querySelectorAll(".card-checkbox:checked");
   const idsToCheck = Array.from(checkboxes).map((cb) => cb.value);
@@ -669,75 +388,53 @@ function removeSelectedCards() {
     return;
   }
 
-  // Fetch full card details for price checking
-  const priceCheckPromises = idsToCheck.map((id) =>
-    fetch(`https://api.tcgdex.net/v2/en/cards/${id}`)
-      .then((response) => (response.ok ? response.json() : null))
-      .catch((error) => {
-        console.error(`Error fetching card ${id}:`, error);
-        return null;
-      }),
-  );
+  // Find the selected cards from allCards
+  const selectedCards = allCards.filter((card) => idsToCheck.includes(card.id));
 
-  Promise.all(priceCheckPromises).then((cards) => {
-    const priceInfo = cards
-      .filter((card) => card !== null)
-      .map((card) => {
-        const usdPrice = card.pricing?.tcgplayer?.holofoil?.marketPrice || 0;
-        const eurPrice = card.pricing?.cardmarket?.avg || 0;
-        const sortPrice = usdPrice || eurPrice;
+  const priceInfo = selectedCards
+    .map((card) => {
+      const usdPrice = extractUSDPrice(card);
+      const cadPrice = usdPrice * USD_TO_CAD_RATE;
 
-        return {
-          name: card.name,
-          id: card.id,
-          usdPrice,
-          eurPrice,
-          sortPrice,
-          pricing: card.pricing,
-        };
-      })
-      .sort((a, b) => b.sortPrice - a.sortPrice);
+      return {
+        name: card.name,
+        id: card.id,
+        usdPrice,
+        cadPrice,
+        card: card,
+      };
+    })
+    .sort((a, b) => b.usdPrice - a.usdPrice);
 
-    // Log to console with full details
-    console.log("=== PRICE CHECK RESULTS ===");
-    priceInfo.forEach((info) => {
-      console.log(
-        `${info.name} (${info.id}):\n` +
-          `  USD: $${info.usdPrice.toFixed(2)}\n` +
-          `  EUR: €${info.eurPrice.toFixed(2)}\n` +
-          `  Sort Price: $${info.sortPrice.toFixed(2)}\n` +
-          `  Full Pricing:`,
-        info.pricing,
-      );
-    });
-
-    // Create summary for alert
-    const summary = priceInfo
-      .map(
-        (info) =>
-          `${info.name}\n  USD: $${info.usdPrice.toFixed(2)} | EUR: €${info.eurPrice.toFixed(2)}\n  Sort: $${info.sortPrice.toFixed(2)}`,
-      )
-      .join("\n\n");
-
-    alert(
-      `PRICE CHECK (${idsToCheck.length} cards)\n\n${summary}\n\n✓ Check console for full pricing details`,
+  // Log to console with full details
+  console.log("=== PRICE CHECK RESULTS ===");
+  priceInfo.forEach((info) => {
+    console.log(
+      `${info.name} (${info.id}):\n` +
+        `  USD: $${info.usdPrice.toFixed(2)}\n` +
+        `  CAD: C$${info.cadPrice.toFixed(2)}\n` +
+        `  Full Card Data:`,
+      info.card,
     );
   });
+
+  // Create summary for alert
+  const summary = priceInfo
+    .map(
+      (info) =>
+        `${info.name}\n  USD: $${info.usdPrice.toFixed(2)} | CAD: C$${info.cadPrice.toFixed(2)}`,
+    )
+    .join("\n\n");
+
+  alert(
+    `PRICE CHECK (${idsToCheck.length} cards)\n\n${summary}\n\n✓ Check console for full card details`,
+  );
 }
 
 // Function to load default cards on page load
 async function loadDefaultCards() {
-  // Default to searching for popular/valuable cards
-  document.getElementById("pokemonCard").value = "charizard";
-  // Perform the search
-  await searchCards();
-}
-
-// Function to load default cards on page load (show popular cards)
-async function loadDefaultCards() {
-  // Set a default search term for popular cards
-  document.getElementById("pokemonCard").value = "charizard";
-  // Perform the search
+  // Leave search empty to show broader results
+  document.getElementById("pokemonCard").value = "";
   await searchCards();
 }
 
@@ -747,88 +444,192 @@ window.addEventListener("load", async () => {
   loadDefaultCards();
 });
 
-// Function to populate the set filter dropdown
-function populateSetFilter(cards) {
-  const dropdown = document.getElementById("setDropdown");
-  dropdown.innerHTML = "";
+// Function to populate the set filter drawer
+function populateSetFilter() {
+  // Create drawer if it doesn't exist
+  let drawer = document.getElementById("setDrawer");
+  if (!drawer) {
+    // Create overlay
+    const overlay = document.createElement("div");
+    overlay.id = "drawerOverlay";
+    overlay.onclick = closeDrawer;
+    document.body.appendChild(overlay);
 
-  console.log("Populating set filter with", cards.length, "cards");
+    // Create drawer
+    drawer = document.createElement("div");
+    drawer.id = "setDrawer";
+    drawer.className = "drawer";
+    document.body.appendChild(drawer);
+  }
 
-  // Get unique sets
-  const uniqueSets = [
-    ...new Set(
-      cards
-        .map((card) => {
-          console.log(
-            "Full card set data:",
-            card.name,
-            card.set,
-            "ID:",
-            card.id,
-          );
-          // Try set.name, set.id, or extract from card.id and map to name
-          const setId = card.set?.id || card.id?.split("-")[0];
-          return card.set?.name || setsMap[setId] || setId;
-        })
-        .filter((name) => name),
-    ),
-  ].sort();
+  drawer.innerHTML = "";
 
-  console.log("Unique sets:", uniqueSets);
+  // Create drawer header
+  const header = document.createElement("div");
+  header.className = "drawer-header";
 
-  if (uniqueSets.length === 0) {
-    const noSetsMsg = document.createElement("div");
-    noSetsMsg.textContent = "No sets available for filtering";
-    noSetsMsg.style.padding = "10px";
-    dropdown.appendChild(noSetsMsg);
+  const title = document.createElement("h2");
+  title.textContent = "Filter by Sets";
+
+  const closeBtn = document.createElement("button");
+  closeBtn.className = "drawer-close-btn";
+  closeBtn.textContent = "✕";
+  closeBtn.onclick = closeDrawer;
+
+  header.appendChild(title);
+  header.appendChild(closeBtn);
+  drawer.appendChild(header);
+
+  // Create drawer content
+  const content = document.createElement("div");
+  content.className = "drawer-content";
+
+  console.log("Populating drawer with expansion-grouped sets");
+
+  const sets = window.allSetsData || [];
+
+  if (sets.length === 0) {
+    content.innerHTML = '<p class="no-sets-message">No sets available</p>';
+    drawer.appendChild(content);
     return;
   }
 
+  // Group sets by series
+  const groupedSets = {};
+  sets.forEach((set) => {
+    const series = set.series || "Other";
+    if (!groupedSets[series]) {
+      groupedSets[series] = [];
+    }
+    groupedSets[series].push(set);
+  });
+
+  // Sort series by newest release date (newest expansion first)
+  const sortedSeries = Object.keys(groupedSets).sort((a, b) => {
+    // Get the newest set from each series
+    const newestA = groupedSets[a].reduce((newest, set) => {
+      const dateA = new Date(set.releaseDate || 0);
+      const dateNewest = new Date(newest.releaseDate || 0);
+      return dateA > dateNewest ? set : newest;
+    });
+    const newestB = groupedSets[b].reduce((newest, set) => {
+      const dateB = new Date(set.releaseDate || 0);
+      const dateNewest = new Date(newest.releaseDate || 0);
+      return dateB > dateNewest ? set : newest;
+    });
+
+    // Compare newest dates - newest first (descending)
+    const dateA = new Date(newestA.releaseDate || 0);
+    const dateB = new Date(newestB.releaseDate || 0);
+    return dateB - dateA;
+  });
+
   // Add Check All / Clear All buttons
   const buttonsDiv = document.createElement("div");
-  buttonsDiv.className = "buttons";
-  buttonsDiv.style.marginBottom = "10px";
+  buttonsDiv.className = "drawer-action-buttons";
 
   const checkAllBtn = document.createElement("button");
   checkAllBtn.textContent = "Check All";
+  checkAllBtn.className = "drawer-btn";
   checkAllBtn.onclick = () => {
-    const checkboxes = dropdown.querySelectorAll(".set-checkbox");
+    const checkboxes = drawer.querySelectorAll(".set-checkbox");
     checkboxes.forEach((cb) => (cb.checked = true));
   };
 
   const clearAllBtn = document.createElement("button");
   clearAllBtn.textContent = "Clear All";
+  clearAllBtn.className = "drawer-btn";
   clearAllBtn.onclick = () => {
-    const checkboxes = dropdown.querySelectorAll(".set-checkbox");
+    const checkboxes = drawer.querySelectorAll(".set-checkbox");
     checkboxes.forEach((cb) => (cb.checked = false));
   };
 
   buttonsDiv.appendChild(checkAllBtn);
   buttonsDiv.appendChild(clearAllBtn);
-  dropdown.appendChild(buttonsDiv);
+  content.appendChild(buttonsDiv);
 
-  // Add checkboxes for each set
-  uniqueSets.forEach((setName) => {
-    const label = document.createElement("label");
-    label.style.display = "block";
-    label.style.margin = "2px 0";
+  // Create expansion groups
+  sortedSeries.forEach((series) => {
+    const expansionDiv = document.createElement("div");
+    expansionDiv.className = "expansion-group";
 
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = setName;
-    checkbox.className = "set-checkbox";
+    // Expansion header (clickable)
+    const expansionHeader = document.createElement("div");
+    expansionHeader.className = "expansion-header";
+    expansionHeader.onclick = () =>
+      toggleExpansion(series.replace(/\s+/g, "-"));
 
-    label.appendChild(checkbox);
-    label.appendChild(document.createTextNode(` ${setName}`));
-    dropdown.appendChild(label);
+    const arrow = document.createElement("span");
+    arrow.className = "expansion-arrow";
+    arrow.id = `arrow-${series.replace(/\s+/g, "-")}`;
+    arrow.textContent = "▶";
+
+    const seriesName = document.createElement("span");
+    seriesName.className = "expansion-name";
+    seriesName.textContent = series;
+
+    const setCount = document.createElement("span");
+    setCount.className = "expansion-count";
+    setCount.textContent = `(${groupedSets[series].length})`;
+
+    expansionHeader.appendChild(arrow);
+    expansionHeader.appendChild(seriesName);
+    expansionHeader.appendChild(setCount);
+
+    // Sets container (initially hidden)
+    const setsContainer = document.createElement("div");
+    setsContainer.className = "expansion-sets";
+    setsContainer.id = `series-${series.replace(/\s+/g, "-")}`;
+    setsContainer.style.display = "none";
+
+    // Sort sets by release date (newest first)
+    groupedSets[series].sort((a, b) => {
+      const dateA = new Date(a.releaseDate || 0);
+      const dateB = new Date(b.releaseDate || 0);
+      return dateB - dateA;
+    });
+
+    // Add checkboxes for each set
+    groupedSets[series].forEach((set) => {
+      const label = document.createElement("label");
+      label.className = "set-label";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.value = set.id;
+      checkbox.className = "set-checkbox";
+
+      const setName = document.createElement("span");
+      setName.textContent = set.name;
+
+      label.appendChild(checkbox);
+      label.appendChild(setName);
+      setsContainer.appendChild(label);
+    });
+
+    expansionDiv.appendChild(expansionHeader);
+    expansionDiv.appendChild(setsContainer);
+    content.appendChild(expansionDiv);
   });
 
-  // Add apply button
+  drawer.appendChild(content);
+
+  // Create drawer footer with apply button
+  const footer = document.createElement("div");
+  footer.className = "drawer-footer";
+
   const applyBtn = document.createElement("button");
   applyBtn.textContent = "Apply Filter";
-  applyBtn.onclick = applySetFilter;
-  applyBtn.style.margin = "10px";
-  dropdown.appendChild(applyBtn);
+  applyBtn.className = "apply-filter-btn";
+  applyBtn.onclick = () => {
+    applySetFilter();
+    closeDrawer();
+  };
+
+  footer.appendChild(applyBtn);
+  drawer.appendChild(footer);
+
+  console.log(`Created drawer with ${sortedSeries.length} expansion groups`);
 }
 
 // Function to apply set filter
@@ -837,7 +638,14 @@ function applySetFilter() {
   window.selectedSets = Array.from(checkboxes).map((cb) => cb.value);
   console.log("Applied set filter:", window.selectedSets);
   currentPage = 1; // Reset to first page
-  applyFilters();
+
+  // Set sort order to high-to-low when filtering by sets
+  const sortOrderSelect = document.getElementById("sortOrder");
+  if (sortOrderSelect && window.selectedSets.length > 0) {
+    sortOrderSelect.value = "high-to-low";
+  }
+
+  searchCards(); // Re-search to fetch cards from selected sets
 }
 
 // Function to update cards per page
@@ -848,46 +656,107 @@ function updateCardsPerPage() {
   applyFilters();
 }
 
-// Function to toggle dropdown visibility
+// Function to toggle drawer visibility
 function toggleDropdown() {
-  const dropdown = document.getElementById("setDropdown");
-  dropdown.style.display =
-    dropdown.style.display === "block" ? "none" : "block";
+  const drawer = document.getElementById("setDrawer");
+  const overlay = document.getElementById("drawerOverlay");
+  drawer.classList.toggle("open");
+  overlay.classList.toggle("show");
+}
+
+// Function to close drawer
+function closeDrawer() {
+  const drawer = document.getElementById("setDrawer");
+  const overlay = document.getElementById("drawerOverlay");
+  drawer.classList.remove("open");
+  overlay.classList.remove("show");
+}
+
+// Function to toggle expansion group
+function toggleExpansion(seriesName) {
+  const setsContainer = document.getElementById(`series-${seriesName}`);
+  const arrow = document.getElementById(`arrow-${seriesName}`);
+
+  if (
+    setsContainer.style.display === "none" ||
+    setsContainer.style.display === ""
+  ) {
+    // Count the number of sets to calculate rows needed
+    const numberOfSets = setsContainer.children.length;
+    const numberOfRows = Math.ceil(numberOfSets / 3);
+
+    setsContainer.style.display = "grid";
+    setsContainer.style.gridTemplateColumns = "repeat(3, 1fr)";
+    setsContainer.style.gridTemplateRows = `repeat(${numberOfRows}, auto)`;
+    setsContainer.style.gridAutoFlow = "column";
+    setsContainer.style.gap = "6px";
+    arrow.textContent = "▼";
+  } else {
+    setsContainer.style.display = "none";
+    arrow.textContent = "▶";
+  }
 }
 
 // Function to load sets data
 async function loadSetsData() {
   try {
-    const sets = await tcgdex.fetch("sets");
+    console.log("Loading sets from Pokemon TCG API...");
+    const response = await fetch(`${POKEMON_TCG_API_BASE}/sets`, {
+      headers: {
+        "X-Api-Key": POKEMON_TCG_API_KEY,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to load sets: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const sets = data.data || [];
+
+    // Store both the map and full set data
     setsMap = {};
+    window.allSetsData = sets; // Store full set objects for grouping
     sets.forEach((set) => {
       setsMap[set.id] = set.name;
     });
-    console.log("Loaded sets map:", setsMap);
+
+    console.log(`Loaded ${sets.length} sets from Pokemon TCG API`);
+
+    // Populate set filter with all available sets
+    populateSetFilter();
   } catch (error) {
     console.error("Error loading sets data:", error);
   }
-}
-
-// Function to load default cards on page load (show popular cards)
-async function loadDefaultCards() {
-  // Leave search empty to show broader results
-  document.getElementById("pokemonCard").value = "";
-  // Perform the search
-  await searchCards();
 }
 
 // Load default cards when the page loads
 window.addEventListener("load", async () => {
   await loadSetsData();
   loadDefaultCards();
+
+  // Add Enter key listener to search input
+  const searchInput = document.getElementById("pokemonCard");
+  if (searchInput) {
+    searchInput.addEventListener("keypress", (event) => {
+      if (event.key === "Enter") {
+        searchCards();
+      }
+    });
+  }
 });
+
+
 
 // Make the functions globally available (since onclick uses them)
 window.searchCards = searchCards;
 window.applyFilters = applyFilters;
 window.changePage = changePage;
+window.goToPage = goToPage;
+window.scrollToTop = scrollToTop;
 window.removeSelectedCards = removeSelectedCards;
 window.toggleDropdown = toggleDropdown;
+window.closeDrawer = closeDrawer;
+window.toggleExpansion = toggleExpansion;
 window.applySetFilter = applySetFilter;
 window.updateCardsPerPage = updateCardsPerPage;
