@@ -1,0 +1,29 @@
+:root {
+  --primary-color: #3d3d3d;
+  --secondary-color: gold;
+  --background: #3d3d3d;
+  --card-bg: #ffffff;
+  --text-primary: #2c3e50;
+  --text-secondary: #080808;
+  --border: #e1e8ed;
+  --gold: #ffcb05;
+  --dark-bg: #3d3d3d;
+  --danger: #f44336;
+  --success: #4CAF50;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background-image: url("../pictures/luxury_ball.png");
+  background-size: cover;
+}
+
+html, body {
+  height: 100%;
+}

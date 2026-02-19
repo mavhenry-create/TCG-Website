@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sets</title>
+    <link rel="stylesheet" href="../CSS/variables.css" />
+    <link rel="stylesheet" href="../CSS/navbar.css" />
+    <link rel="stylesheet" href="../CSS/buttons.css" />
+    <link rel="stylesheet" href="../CSS/cards.css" />
+    <link rel="stylesheet" href="../CSS/wishlist.css" />
+    <link rel="stylesheet" href="../CSS/notifications.css" />
+    <link rel="stylesheet" href="../CSS/drawer.css" />
+    <link rel="stylesheet" href="../CSS/forms.css" />
+    <link rel="stylesheet" href="../CSS/animations.css" />
+    <link rel="stylesheet" href="../CSS/layout.css" />
+    <link rel="stylesheet" href="../CSS/budget.css" />
+  </head>
+  <body>
+    <nav id="navbar" class="navbar-static">
+      <div id="container">
+        <ul class="links">
+          <li><a href="./TCG-home.html">Home</a></li>
+          <li><a href="./TCG-sets.html">Sets</a></li>
+          <li><a href="./TCG-Wishlist.html">Wishlist</a></li>
+          <li><a href="./TCG-budget.html">Budget</a></li>
+        </ul>
+        <div class="login-container">
+          <button id="loginbtn" type="button">Login</button>
+          <div id="loginForm" class="dropdown-login-content">
+            <form>
+              <label for="username">Username:</label>
+              <input type="text" id="username" name="username" required />
+              <label for="password">Password:</label>
+              <input type="password" id="password" name="password" required />
+              <button class="loginbtn2" type="submit">Login</button>
+            </form>
+            <p class="DHAA">Don't have an account?</p>
+            <a href="./TCG-Signup.html">Sign up</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div id="card-main-controls">
+        <input
+          type="text"
+          id="card-search-input"
+          placeholder="Search cards...."
+        />
+        <button id="open-filter-btn" class="open-filter-btn">Filter</button>
+
+        <label id="Price"
+          >Sort by Price:
+          <select id="sort-select">
+            <option value="">Default</option>
+            <option value="price-high" selected>Highest to Lowest</option>
+            <option value="card-number-high">Card number (descending)</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="drawer-overlay" class="drawer-overlay"></div>
+
+      <div id="filter-drawer" class="drawer">
+        <div class="drawer-header">
+          <h2>Filter by Set</h2>
+          <button id="drawer-close-btn" class="drawer-close-btn">
+            &times;
+          </button>
+        </div>
+
+        <div id="drawer-content" class="drawer-content"></div>
+
+        <div class="drawer-footer">
+          <button id="apply-filter-btn" class="apply-filter-btn">
+            Apply Filters
+          </button>
+          <button id="clear-filter-btn" class="clear-filter-btn">
+            Clear All
+          </button>
+        </div>
+      </div>
+
+      <div id="card-display-tests" class="card-grid"></div>
+
+      <div
+        id="pagination-bottom"
+        style="margin: 20px 0; display: none; text-align: center"
+      >
+        <button onclick="changePage(-1)" id="prevBtnBottom" disabled>
+          Previous
+        </button>
+        <span id="pageNumbers" style="margin: 0 10px"></span>
+        <button onclick="changePage(1)" id="nextBtnBottom" disabled>
+          Next
+        </button>
+        <button onclick="scrollToTop()" style="margin-left: 20px">
+          Return to Top
+        </button>
+      </div>
+    </div>
+
+    <!-- Pokeball Loading Animation -->
+    <div id="pokeball-loader" class="pokeball-loader">
+      <div class="Pokeball">
+        <div class="Pokeball-shell">
+          <div class="Pokeball-top"></div>
+          <div class="Pokeball-top2"></div>
+          <div class="Pokeball-top3"></div>
+          <div class="Pokeball-middle"></div>
+          <div class="Pokeball-middle2"></div>
+        </div>
+      </div>
+    </div>
+
+    <script src="../JavaScript/Wishlist/wishlist.js"></script>
+    <script src="../JavaScript/APItest.js"></script>
+    <script src="../JavaScript/login.js"></script>
+  </body>
+</html>

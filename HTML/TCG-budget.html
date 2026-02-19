@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pokemon TCG Budget Tracker</title>
+    <link rel="stylesheet" href="../CSS/variables.css" />
+    <link rel="stylesheet" href="../CSS/navbar.css" />
+    <link rel="stylesheet" href="../CSS/buttons.css" />
+    <link rel="stylesheet" href="../CSS/cards.css" />
+    <link rel="stylesheet" href="../CSS/wishlist.css" />
+    <link rel="stylesheet" href="../CSS/notifications.css" />
+    <link rel="stylesheet" href="../CSS/drawer.css" />
+    <link rel="stylesheet" href="../CSS/forms.css" />
+    <link rel="stylesheet" href="../CSS/animations.css" />
+    <link rel="stylesheet" href="../CSS/layout.css" />
+    <link rel="stylesheet" href="../CSS/budget.css" />
+  </head>
+  <body>
+    <nav id="navbar" class="navbar-static">
+      <div id="container">
+        <ul class="links">
+          <li><a href="./TCG-home.html">Home</a></li>
+          <li><a href="./TCG-sets.html">Sets</a></li>
+          <li><a href="./TCG-Wishlist.html">Wishlist</a></li>
+          <li><a href="./TCG-budget.html">Budget</a></li>
+        </ul>
+      <div class="login-container">
+          <button id="loginbtn" type="button">Login</button>
+          <div id="loginForm" class="dropdown-login-content">
+            <form>
+              <label for="username">Username:</label>
+              <input type="text" id="username" name="username" autocomplete="username" required />
+              <label for="password">Password:</label>
+              <input type="password" id="password" name="password" autocomplete="current-password" required />
+              <button class="loginbtn2" type="submit">Login</button>
+            </form>
+            <p class="DHAA">Don't have an account?</p>
+            <a href="./TCG-Signup.html">Sign up</a>
+          </div>
+        </div>  
+      </div>
+
+    </nav>
+      <div class="container">
+    <header>
+      <h1>Pokemon TCG Budget Tracker</h1>
+      <div class="header-actions">
+        <button id="import-wishlist-btn" class="btn-primary" type="button">
+          Import from Wishlist
+        </button>
+      </div>
+    </header>
+
+    <main>
+    
+      <section class="budget-statistics">
+        <div class="stat-card">
+          <h3>In Budget Cards</h3>
+          <p id="budget-stat-total-cards">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Purchased</h3>
+          <p id="budget-stat-purchased">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Unpurchased</h3>
+          <p id="budget-stat-unpurchased">0</p>
+        </div>
+        <div class="stat-card">
+          <h3>Total Value</h3>
+          <p id="budget-stat-total-value">$0.00</p>
+        </div>
+        <div class="stat-card">
+          <h3>Amount Spent</h3>
+          <p id="budget-stat-spent">$0.00</p>
+        </div>
+        <div class="stat-card">
+          <h3>Budget Limit</h3>
+          <p id="budget-stat-budget-limit">$0.00</p>
+        </div>
+        <div class="stat-card">
+          <h3>Remaining Limit</h3>
+          <p id="budget-stat-remaining">$0.00</p>
+        </div>
+        <div class="stat-card">
+          <h3>Cards To Buy Value</h3>
+          <p id="budget-stat-cards-remaining">$0.00</p>
+        </div>
+        <div class="budget-limit-card">
+          <h3>Set Your Budget</h3>
+          <div class="budget-limit-input-group">
+            <label for="budget-limit-input">Total Budget ($):</label>
+            <input
+              type="number"
+              id="budget-limit-input"
+              placeholder="0.00"
+              step="0.01"
+              min="0"
+            />
+            <button id="budget-limit-btn" class="btn-primary" type="button">
+              Set Budget
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div id="budget-empty-state" class="empty-state" style="display: none">
+        <h2>No Cards in Budget</h2>
+        <p>Click "Import from Wishlist" to get started!</p>
+      </div>
+
+      <div id="budget-grid" class="budget-grid" role="list"></div>
+    </div>
+    </main>
+
+    <script src="../JavaScript/Wishlist/wishlist.js"></script>
+    <script src="../JavaScript/Budget/budget.js"></script>
+    <script src="../JavaScript/login.js"></script>
+  </body>
+</html>

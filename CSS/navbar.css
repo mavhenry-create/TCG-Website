@@ -1,0 +1,195 @@
+#navbar {
+  background-color: #3d3d3d;
+  padding: 0.75rem 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  top: 0;
+  width: 100%;
+  z-index: 1000;
+  position: sticky;
+}
+
+#container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+ul.links {
+  list-style-type: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  align-items: center;
+  flex: 1;
+  font-size: larger;
+}
+
+ul.links li {
+  margin: 0;
+}
+
+ul.links a {
+  text-decoration: none;
+  color: var(--gold);
+  font-weight: 500;
+  transition: color 0.3s ease;
+  background-color: #3d3d3d;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+}
+
+ul.links a:hover {
+  color: rgb(255, 255, 255);
+}
+
+.login-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+#loginbtn {
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color);
+  color: gold;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+  white-space: nowrap;
+  position: relative;
+}
+
+#loginbtn:hover {
+  background-color: white;
+}
+
+#loginbtn.logged-in {
+  background-color: var(--success);
+}
+
+.dropdown-login-content {
+  display: none;
+  position: absolute;
+  background-color: var(--dark-bg);
+  min-width: 250px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  top: 100%;
+  right: 0;
+  border: 1px solid var(--gold);
+  color: white;
+  padding: 1rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.dropdown-login-content.show {
+  display: block;
+}
+
+.dropdown-login-content form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.dropdown-login-content label {
+  font-weight: 500;
+  font-size: 0.9rem;
+}
+
+.dropdown-login-content input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.dropdown-login-content button[type="submit"] {
+  padding: 0.5rem;
+  background-color: var(--secondary-color);
+  color: #3d3d3d;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.dropdown-login-content a {
+  color: var(--gold);
+  text-decoration: none;
+  font-size: 0.9rem;
+  display: flex;
+  justify-content: center;
+}
+
+.DHAA {
+  text-align: center;
+  font-size: 0.9rem;
+  color: white;
+  margin-bottom: 0.5rem;
+}
+
+.logout-btn {
+  padding: 0.5rem;
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.dropdown-login-content {
+  display: none;
+  position: absolute;
+  background-color: black;
+  min-width: 150px;
+  box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
+  z-index: 1;
+  top: 100%;
+  right: 0;
+  border: 1px solid var(--gold);
+  color: white;
+  padding: 0.5rem;
+  border-radius: 4px;
+  margin-top: 0.5rem;
+}
+
+.logout-btn {
+  padding: 0.5rem 1rem;
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  display: block;
+}
+
+.logout-btn:hover {
+  background-color: #d32f2f;
+}
+
+#loginbtn.logged-in {
+  background-color: black;
+  color: var(--gold);
+  border: 1px solid var(--gold);
+}
+
+#loginbtn.logged-in:hover {
+  background-color: #1a1a1a;
+  color: white;
+}

@@ -1,0 +1,161 @@
+.btn-primary,
+.btn-secondary {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background-color: #000000;
+  color: var(--gold);
+  border: 2px solid var(--gold);
+}
+
+.btn-primary:hover {
+  background-color: var(--gold);
+  color: #000000;
+  transform: translateY(-2px);
+}
+
+.btn-secondary {
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: 2px solid white;
+}
+
+.btn-secondary:hover {
+  background: rgba(0, 0, 0, 0.8);
+  transform: translateY(-2px);
+}
+
+.btn-remove {
+  background-color: var(--danger);
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-remove:hover {
+  background-color: #da190b;
+}
+
+.btn-wishlist {
+  padding: 8px 16px;
+  background-color: var(--success);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.3s ease;
+}
+
+.btn-wishlist:hover:not(:disabled) {
+  background-color: #45a049;
+  transform: translateY(-2px);
+}
+
+.btn-wishlist.in-wishlist {
+  background-color: #757575;
+  cursor: not-allowed;
+}
+
+.btn-wishlist:disabled {
+  opacity: 0.6;
+}
+
+.btn-purchased {
+  background: #f0f0f0;
+  color: var(--text-primary);
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.btn-purchased.active {
+  background: #95e1d3;
+  color: white;
+}
+
+.btn-budget {
+  background: #4ecdc4;
+  color: white;
+  padding: 0.75rem;
+  border: none;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.btn-budget.active {
+  background: #27ae60;
+}
+
+.btn-budget:hover {
+  background: #1abc9c;
+}
+
+.open-filter-btn {
+  padding: 10px 20px;
+  background: #000000;
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.open-filter-btn:hover {
+  background: #ffffff;
+  color: var(--danger);
+}
+
+.apply-filter-btn,
+.clear-filter-btn {
+  flex: 1;
+  padding: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.2s;
+  background: #000000;
+  color: var(--gold);
+}
+
+.apply-filter-btn:hover,
+.clear-filter-btn:hover {
+  background: var(--danger);
+  color: white;
+}
+
+
+
+#card-search-input {
+  padding: 10px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  font-size: 1rem;
+}
+
+#sort-select {
+  padding: 10px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  font-size: 1rem;
+
+}
+

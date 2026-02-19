@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared Wishlist - Pokemon TCG</title>
+    <link rel="stylesheet" href="../CSS/variables.css" />
+    <link rel="stylesheet" href="../CSS/navbar.css" />
+    <link rel="stylesheet" href="../CSS/buttons.css" />
+    <link rel="stylesheet" href="../CSS/cards.css" />
+    <link rel="stylesheet" href="../CSS/wishlist.css" />
+    <link rel="stylesheet" href="../CSS/forms.css" />
+    <link rel="stylesheet" href="../CSS/animations.css" />
+    <link rel="stylesheet" href="../CSS/layout.css" />
+  </head>
+  <body>
+    <nav id="navbar" class="navbar-static">
+      <div id="container">
+        <ul class="links">
+          <li><a href="./TCG-home.html">Home</a></li>
+          <li><a href="./TCG-sets.html">Sets</a></li>
+          <li><a href="./TCG-Wishlist.html">Wishlist</a></li>
+          <li><a href="./TCG-budget.html">Budget</a></li>
+        </ul>
+        <div class="login-container">
+          <button id="loginbtn" type="button">Login</button>
+          <div id="loginForm" class="dropdown-login-content">
+            <form>
+              <label for="username">Username:</label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                autocomplete="username"
+                required
+              />
+              <label for="password">Password:</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                autocomplete="current-password"
+                required
+              />
+              <button class="loginbtn2" type="submit">Login</button>
+            </form>
+            <p class="DHAA">Don't have an account?</p>
+            <a href="./TCG-Signup.html">Sign up</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+      <header
+        style="
+          padding: 2rem;
+          text-align: center;
+          background: linear-gradient(
+            135deg,
+            var(--primary-color),
+            var(--gold)
+          );
+          color: white;
+          border-radius: 8px;
+          margin-bottom: 2rem;
+        "
+      >
+        <h1>Wishlist Comparison</h1>
+        <p>Compare wishlists and find matching cards</p>
+      </header>
+
+      <div id="comparison-content"></div>
+    </div>
+
+    <script src="../JavaScript/Wishlist/wishlist.js"></script>
+    <script src="../JavaScript/login.js"></script>
+    <script>
+      async function loadSharedWishlist() {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get("share");
+
+        if (!token) {
+          document.getElementById("comparison-content").innerHTML =
+            '<p style="text-align: center; color: red;">No wishlist token provided.</p>';
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/wishlist/shared/${token}`, {
+            credentials: "include",
+          });
+          const data = await response.json();
+
+          if (data.success) {
+            displayWishlist(data.owner, data.wishlist, token);
+          } else {
+            document.getElementById("comparison-content").innerHTML =
+              '<p style="text-align: center; color: red;">Wishlist not found or has expired.</p>';
+          }
+        } catch (error) {
+          console.error("Error loading wishlist:", error);
+          document.getElementById("comparison-content").innerHTML =
+            '<p style="text-align: center; color: red;">Error loading wishlist.</p>';
+        }
+      }
+
+      function displayWishlist(owner, wishlist, token) {
+        const html = `
+          <div style="grid-column: 1 / -1; padding: 2rem; text-align: center; background: linear-gradient(135deg, var(--primary-color), var(--gold)); color: white; border-radius: 8px; margin-bottom: 2rem;">
+            <h2>${owner.username}'s Wishlist</h2>
+            <p>${wishlist.length} cards in wishlist</p>
+            <button onclick="compareWithMine('${token}')" class="cta-btn cta-btn-primary" style="margin-top: 1rem;">
+              Compare with Mine (Login Required)
+            </button>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 20px;">
+            ${wishlist
+              .map((item) => {
+                const imageUrl =
+                  item.imageLarge ||
+                  item.imagelarge ||
+                  item.imageSmall ||
+                  item.imagesmall ||
+                  "/pictures/placeholder.png";
+
+                return `
+                  <div class="wishlist-card">
+                    <img src="${imageUrl}" alt="${item.name}" onerror="this.src='/pictures/placeholder.png'">
+                    <h3>${item.name}</h3>
+                    <div class="wishlist-card-info">
+                      <p><strong>Set:</strong> ${item.setName || item.setname || "Unknown"}</p>
+                      <p><strong>Number:</strong> ${item.number || "N/A"}</p>
+                      <p><strong>Rarity:</strong> ${item.rarity || "N/A"}</p>
+                    </div>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        `;
+        document.getElementById("comparison-content").innerHTML = html;
+      }
+
+      async function compareWithMine(shareToken) {
+        // Use global wrapper from wishlist.js
+        return compareWishlists(shareToken);
+      }
+
+      loadSharedWishlist();
+    </script>
+  </body>
+</html>

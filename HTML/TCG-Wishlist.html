@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Wishlist - Pokemon TCG</title>
+    <link rel="stylesheet" href="../CSS/variables.css" />
+    <link rel="stylesheet" href="../CSS/navbar.css" />
+    <link rel="stylesheet" href="../CSS/buttons.css" />
+    <link rel="stylesheet" href="../CSS/cards.css" />
+    <link rel="stylesheet" href="../CSS/wishlist.css" />
+    <link rel="stylesheet" href="../CSS/notifications.css" />
+    <link rel="stylesheet" href="../CSS/drawer.css" />
+    <link rel="stylesheet" href="../CSS/forms.css" />
+    <link rel="stylesheet" href="../CSS/animations.css" />
+    <link rel="stylesheet" href="../CSS/layout.css" />
+    <link rel="stylesheet" href="../CSS/budget.css" />
+    <script src="../JavaScript/Wishlist/wishlist.js" defer></script>
+  </head>
+  <body>
+    <nav id="navbar" class="navbar-static">
+      <div id="container">
+        <ul class="links">
+          <li><a href="./TCG-home.html">Home</a></li>
+          <li><a href="./TCG-sets.html">Sets</a></li>
+          <li><a href="./TCG-Wishlist.html">Wishlist</a></li>
+          <li><a href="./TCG-budget.html">Budget</a></li>
+        </ul>
+        <div class="login-container">
+          <button id="loginbtn" type="button">Login</button>
+          <div id="loginForm" class="dropdown-login-content">
+            <form>
+              <label for="username">Username:</label>
+              <input
+                type="text"
+                id="username"
+                name="username"
+                autocomplete="username"
+                required
+              />
+              <label for="password">Password:</label>
+              <input
+                type="password"
+                id="password"
+                name="password"
+                autocomplete="current-password"
+                required
+              />
+              <button class="loginbtn2" type="submit">Login</button>
+            </form>
+            <p class="DHAA">Don't have an account?</p>
+            <a href="./TCG-Signup.html">Sign up</a>
+          </div>
+        </div>
+      </div>
+    </nav>
+    <main>
+      <div class="container">
+        <div
+          id="collection-not-signed-in-message-bar"
+          class="message-bar message-bar-info"
+        ></div>
+        <div id="collection-controls"></div>
+        <section
+          class="wishlist-statistics"
+          aria-labelledby="statistics-heading"
+        >
+          <h2 id="statistics-heading">Wishlist Statistics</h2>
+
+          <div class="stats-grid">
+            <div class="stat-item">
+              <strong>Total Cards:</strong>
+              <span id="stat-total-cards" aria-live="polite">0</span>
+            </div>
+            <div class="stat-item">
+              <strong>Total Value:</strong>
+              <span id="stat-total-value" aria-live="polite">$0.00</span>
+            </div>
+            <div class="stat-item">
+              <strong>Average Value:</strong>
+              <span id="stat-average-value" aria-live="polite">$0.00</span>
+            </div>
+            <div class="stat-item">
+              <strong>High Priority:</strong>
+              <span id="stat-high-priority" aria-live="polite">0</span>
+            </div>
+            <div class="stat-item">
+              <strong>Medium Priority:</strong>
+              <span id="stat-medium-priority" aria-live="polite">0</span>
+            </div>
+            <div class="stat-item">
+              <strong>Low Priority:</strong>
+              <span id="stat-low-priority" aria-live="polite">0</span>
+            </div>
+            <div class="stat-item" style="grid-column: span 2">
+              <strong>Most Expensive:</strong>
+              <span id="stat-most-expensive" aria-live="polite">N/A</span>
+            </div>
+          </div>
+        </section>
+        <div
+          id="empty-state"
+          class="empty-state"
+          style="display: none"
+          role="status"
+          aria-live="polite"
+        >
+          <p>Your wishlist is empty. Start adding cards from the Sets page!</p>
+        </div>
+
+        <div id="wishlist-grid" class="wishlist-grid" role="list"></div>
+                  <div class="wishlist-actions">
+          <button onclick="generateShareLink()" class="share-btn">
+            📤 Share Wishlist
+          </button>
+
+        </div>
+      </div>
+    </main>
+    <script src="../JavaScript/login.js"></script>
+    <script>
+      function promptCompareWishlist() {
+        const shareToken = prompt(
+          "Enter the share token or paste the full URL:",
+        );
+
+        if (!shareToken) return;
+
+        const token = shareToken.includes("share=")
+          ? shareToken.split("share=")[1]
+          : shareToken;
+
+        if (token) {
+          compareWishlists(token);
+        }
+      }
+    </script>
+  </body>
+</html>
