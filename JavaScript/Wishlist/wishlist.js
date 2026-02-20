@@ -145,12 +145,14 @@ class WishlistManager {
   }
 
   getImageUrl(item) {
+    // ✅ Check database columns first (lowercase from server.js)
     return (
-      item.imageLarge ||
-      item.imagelarge ||
-      item.imageSmall ||
-      item.imagesmall ||
-      "/pictures/placeholder.png"
+      item.imagelarge || // From database
+      item.imagesmall || // From database
+      item.imageLarge || // Fallback
+      item.imageSmall || // Fallback
+      item.image || // Fallback
+      "/pictures/placeholder.png" // Last resort
     );
   }
 
@@ -335,17 +337,28 @@ class WishlistManager {
   }
 
   updateStatistics() {
-  const totalCards = this.wishlist.length;
+    const totalCards = this.wishlist.length;
 
-    const getSelectedGrade = (item) => item.selectedgrade || item.selectedGrade || "raw";
-    const getEffectivePrice = (item) => this.getPriceByGrade(item, getSelectedGrade(item));
+    const getSelectedGrade = (item) =>
+      item.selectedgrade || item.selectedGrade || "raw";
+    const getEffectivePrice = (item) =>
+      this.getPriceByGrade(item, getSelectedGrade(item));
 
-    const totalValue = this.wishlist.reduce((sum, item) => sum + getEffectivePrice(item), 0);
+    const totalValue = this.wishlist.reduce(
+      (sum, item) => sum + getEffectivePrice(item),
+      0,
+    );
     const avgValue = totalCards > 0 ? totalValue / totalCards : 0;
 
-    const highPriority = this.wishlist.filter((w) => w.priority === "high").length;
-    const mediumPriority = this.wishlist.filter((w) => w.priority === "medium").length;
-    const lowPriority = this.wishlist.filter((w) => w.priority === "low").length;
+    const highPriority = this.wishlist.filter(
+      (w) => w.priority === "high",
+    ).length;
+    const mediumPriority = this.wishlist.filter(
+      (w) => w.priority === "medium",
+    ).length;
+    const lowPriority = this.wishlist.filter(
+      (w) => w.priority === "low",
+    ).length;
 
     const sortedByPrice = [...this.wishlist].sort(
       (a, b) => getEffectivePrice(b) - getEffectivePrice(a),
@@ -358,10 +371,9 @@ class WishlistManager {
       if (element) element.textContent = value;
     };
 
-    const mostExpensiveDisplay = mostExpensive 
-  ? `${mostExpensive.name} - $${this.getPriceByGrade(mostExpensive, mostExpensive.selectedgrade || mostExpensive.selectedGrade || "raw").toFixed(2)}`
-  : "N/A";
-
+    const mostExpensiveDisplay = mostExpensive
+      ? `${mostExpensive.name} - $${this.getPriceByGrade(mostExpensive, mostExpensive.selectedgrade || mostExpensive.selectedGrade || "raw").toFixed(2)}`
+      : "N/A";
 
     updateElement("stat-total-cards", totalCards);
     updateElement("stat-total-value", `$${totalValue.toFixed(2)}`);
@@ -394,9 +406,12 @@ class WishlistManager {
         method: "POST",
         credentials: "include",
       });
-     const data = await response.json();
+      const data = await response.json();
       if (!response.ok || !data.success) {
-        this.showNotification(data.message || "Failed to generate share link", "error");
+        this.showNotification(
+          data.message || "Failed to generate share link",
+          "error",
+        );
         return;
       }
 
@@ -452,16 +467,18 @@ class WishlistManager {
 
   showComparisonResults(comparison) {
     const cardHtml = (card) => {
-      const image =
+      // ✅ FIX: Get image URL first, then use it
+      const imageUrl =
         card.imageLarge ||
         card.imagelarge ||
         card.imageSmall ||
         card.imagesmall ||
-        "/pictures/placeholder.png";
+        card.image ||
+        ""; // Empty string if no image
 
       return `
         <div style="display:flex; gap:.5rem; align-items:center; padding:.5rem; border:1px solid #eee; border-radius:6px; margin-bottom:.5rem; background:${card.matched ? "#eaffea" : "#fff"};">
-          <img src="${image}" alt="${card.name}" style="width:42px; height:58px; object-fit:cover; border-radius:4px;" onerror="this.src='/pictures/placeholder.png'">
+          <img src="${imageUrl}" alt="${card.name}" style="width:42px; height:58px; object-fit:cover; border-radius:4px;" onerror="this.style.display='none'">
           <div style="min-width:0;">
             <div style="font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${card.name}</div>
             <div style="font-size:.85rem; color:#666;">${card.setname || "Unknown"} • #${card.number || "N/A"}</div>
@@ -502,10 +519,10 @@ class WishlistManager {
 }
 
 const wishlistManager = new WishlistManager();
-window.wishlistManager = wishlistManager; // Expose to global scope for inline handlers
+window.wishlistManager = wishlistManager;
 window.generateShareLink = function generateShareLink() {
   return wishlistManager.generateShareLink();
-}
+};
 
 window.compareWishlists = function compareWishlists(shareToken) {
   return wishlistManager.compareWishlists(shareToken);

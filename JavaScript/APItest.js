@@ -1,7 +1,8 @@
 let RAPIDAPI_KEY = "";
 let RAPIDAPI_HOST = "pokemon-tcg-api.p.rapidapi.com";
 
-// Load config from server
+const SERIES_ID_REGEX = /\s+/g;
+
 async function loadApiConfig() {
   try {
     const response = await fetch("/api/config");
@@ -40,96 +41,99 @@ const searchTerms = {
   sort: "relevance",
 };
 
+const buildSearchUrl = (terms) => {
+  const params = new URLSearchParams();
+  Object.entries(terms).forEach(([key, val]) => {
+        if (val !== "" && val !== 0) params.append(key, val);
+      });
+      return `${BASE_URL}/search?${params.toString()}`;
+};
+
+
 const searchForCards = async (maxPages = 6) => {
   const allCards = [];
   const seenIds = new Set(); // Track unique card IDs
   let currentPage = 0;
 
-  console.log(`🔍 Starting search with maxPages: ${maxPages}`);
+  console.log(`Starting search with maxPages: ${maxPages}`);
 
   while (currentPage < maxPages) {
     searchTerms.page = currentPage;
-    let url = `${BASE_URL}/search?`;
+    const url = buildSearchUrl(searchTerms);
 
-    Object.entries(searchTerms).forEach(([key, val]) => {
-      if (val !== "" && val !== 0) {
-        url += `${key}=${val}&`;
-      }
-    });
-    url = url.slice(0, -1);
-    console.log(`📄 Fetching page ${currentPage}: ${url}`);
+    console.log(`Fetching page ${currentPage}: ${url}`);
 
     try {
       const response = await fetch(`${url}`, options);
       const result = await response.json();
 
-      console.log(`✅ Page ${currentPage} result:`, {
+      console.log(`Page ${currentPage} result:`, {
         dataLength: result.data?.length || 0,
         paging: result.paging,
         totalPages: result.paging?.total,
       });
 
       if (result.data && result.data.length > 0) {
-        // Filter out duplicates
         const uniqueCards = result.data.filter((card) => {
-          if (seenIds.has(card.id)) {
-            return false;
-          }
+          if (seenIds.has(card.id)) return false;
           seenIds.add(card.id);
           return true;
         });
 
         allCards.push(...uniqueCards);
         console.log(
-          `📊 Total unique cards collected so far: ${allCards.length}`,
+          `Total unique cards collected so far: ${allCards.length}`,
         );
 
         if (!result.paging || currentPage >= result.paging.total - 1) {
-          console.log(`🛑 Stopping: No more pages available`);
+          console.log(`Stopping: No more pages available`);
           break;
         }
       } else {
-        console.log(`🛑 Stopping: No data returned`);
+        console.log(`Stopping: No data returned`);
         break;
       }
       currentPage++;
     } catch (err) {
-      console.error(`❌ Error on page ${currentPage}:`, err);
+      console.error(`Error on page ${currentPage}:`, err);
       break;
     }
   }
 
   console.log(
-    `🎯 Final result: ${allCards.length} unique cards from ${currentPage} pages`,
+    `Final result: ${allCards.length} unique cards from ${currentPage} pages`,
   );
   return { data: allCards };
 };
 
 const listCardsByExpansion = async (episodeId, maxPages = 20) => {
+ 
+  const cacheKey = `expansion_${episodeId}`;
+  const cached = localStorage.getItem(cacheKey);
+  const cachedTime = localStorage.getItem(`${cacheKey}_time`);
+
+  if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000) {
+    console.log(`Using cached cards for expansion ${episodeId}`);
+    return JSON.parse(cached);
+  }
+
   const allCards = [];
   const seenIds = new Set();
   let currentPage = 0;
 
-  console.log(`🔍 Fetching expansion ${episodeId} with maxPages: ${maxPages}`);
+  console.log(`Fetching fresh cards for expansion ${episodeId} from API...`);
 
   while (currentPage < maxPages) {
-    let url = `${BASE_URL}/search?`;
-
     const terms = { ...searchTerms, episode_id: episodeId, page: currentPage };
+    const url = buildSearchUrl(terms);
 
-    Object.entries(terms).forEach(([key, val]) => {
-      if (val !== "" && val !== 0) {
-        url += `${key}=${val}&`;
-      }
-    });
-    url = url.slice(0, -1);
-    console.log(`📄 Fetching page ${currentPage}: ${url}`);
+    console.log(`Fetching page ${currentPage}: ${url}`);
 
     try {
       const response = await fetch(`${url}`, options);
       const result = await response.json();
 
-      console.log(`✅ Page ${currentPage} result:`, {
+      console.log(`Page ${currentPage} result:`, {
         dataLength: result.data?.length || 0,
         paging: result.paging,
         totalPages: result.paging?.total,
@@ -141,7 +145,7 @@ const listCardsByExpansion = async (episodeId, maxPages = 20) => {
         const beforeFilter = result.data.length;
         const uniqueCards = result.data.filter((card) => {
           if (seenIds.has(card.id)) {
-            console.log(`⚠️ Duplicate found: ${card.name} (${card.id})`);
+            console.log(`Duplicate found: ${card.name} (${card.id})`);
             return false;
           }
           seenIds.add(card.id);
@@ -149,20 +153,18 @@ const listCardsByExpansion = async (episodeId, maxPages = 20) => {
         });
 
         console.log(
-          `🔢 Page ${currentPage}: ${beforeFilter} cards received, ${uniqueCards.length} unique, ${beforeFilter - uniqueCards.length} duplicates filtered`,
+          `Page ${currentPage}: ${beforeFilter} cards received, ${uniqueCards.length} unique, ${beforeFilter - uniqueCards.length} duplicates filtered`,
         );
 
         allCards.push(...uniqueCards);
-        console.log(`📊 Total unique cards: ${allCards.length}`);
+        console.log(`Total unique cards: ${allCards.length}`);
 
-        // Only stop if no paging info OR we've gone past total pages
         if (result.paging && currentPage < result.paging.total - 1) {
           currentPage++;
         } else if (result.paging && currentPage >= result.paging.total - 1) {
           console.log(
-            `🛑 Reached last page according to API (${currentPage}/${result.paging.total - 1})`,
+            `Reached last page according to API (${currentPage}/${result.paging.total - 1})`,
           );
-          // Try one more page to be sure
           currentPage++;
           const testUrl = `${BASE_URL}/search?episode_id=${episodeId}&page=${currentPage}&sort=relevance`;
           const testResponse = await fetch(testUrl, options);
@@ -170,7 +172,7 @@ const listCardsByExpansion = async (episodeId, maxPages = 20) => {
 
           if (testResult.data && testResult.data.length > 0) {
             console.log(
-              `🎁 Found ${testResult.data.length} more cards on page ${currentPage}!`,
+              `Found ${testResult.data.length} more cards on page ${currentPage}!`,
             );
             const moreUniqueCards = testResult.data.filter((card) => {
               if (!seenIds.has(card.id)) {
@@ -180,29 +182,33 @@ const listCardsByExpansion = async (episodeId, maxPages = 20) => {
               return false;
             });
             allCards.push(...moreUniqueCards);
-            console.log(`📊 Total unique cards now: ${allCards.length}`);
+            console.log(`Total unique cards now: ${allCards.length}`);
           }
           break;
         } else {
           currentPage++;
         }
       } else {
-        console.log(`🛑 No data returned on page ${currentPage}`);
+        console.log(`No data returned on page ${currentPage}`);
         break;
       }
     } catch (err) {
-      console.error(`❌ Error on page ${currentPage}:`, err);
+      console.error(`Error on page ${currentPage}:`, err);
       break;
     }
   }
 
-  console.log(
-    `🎯 FINAL: ${allCards.length} unique cards from pages fetched for expansion ${episodeId}`,
-  );
-  return { data: allCards };
-};
+  const result = { data: allCards };
 
-// Test find expansion by name
+  localStorage.setItem(cacheKey, JSON.stringify(result));
+  localStorage.setItem(`${cacheKey}_time`, Date.now());
+  console.log(`✅ Cached ${allCards.length} cards for expansion ${episodeId} for 7 days`);
+
+  console.log(
+    `FINAL: ${allCards.length} unique cards from pages fetched for expansion ${episodeId}`,
+  );
+  return result;
+};
 
 const findExpansionByName = async (expansionName, maxPages = 10) => {
   const expansionUrl = `https://pokemon-tcg-api.p.rapidapi.com/episodes/search?search=${expansionName}`;
@@ -234,18 +240,25 @@ const searchExpansionCards = async (expansionName) => {
   }
 };
 
-// test inputs for html
-
 let EUR_TO_USD = 1.09;
-let currentCurrency = "USD"; // or 'EUR'
+let currentCurrency = "USD";
 
 const fetchExchangeRate = async () => {
+  const cached = localStorage.getItem("EUR_TO_USD");
+  const cachedTime = localStorage.getItem("EUR_TO_USD_TIME");
+  
+  if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 86400000) {
+    EUR_TO_USD = parseFloat(cached);
+    console.log(`Using cached rate: 1 EUR = ${EUR_TO_USD} USD`);
+    return;
+  }
+
   try {
-    const response = await fetch(
-      "https://api.exchangerate-api.com/v4/latest/EUR",
-    );
+    const response = await fetch("https://api.exchangerate-api.com/v4/latest/EUR");
     const data = await response.json();
     EUR_TO_USD = data.rates.USD;
+    localStorage.setItem("EUR_TO_USD", EUR_TO_USD);
+    localStorage.setItem("EUR_TO_USD_TIME", Date.now());
     console.log(`Exchange rate: 1 EUR = ${EUR_TO_USD} USD`);
   } catch (error) {
     console.error("Failed to fetch exchange rate:", error);
@@ -253,64 +266,45 @@ const fetchExchangeRate = async () => {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadApiConfig(); // Load config FIRST
+  await loadApiConfig(); 
 
   fetchExchangeRate();
   initializeDrawer();
 
   const searchInput = document.getElementById("card-search-input");
-  const searchButton = document.getElementById("card-search-button");
   const cardDisplay = document.getElementById("card-display-tests");
   const sortSelect = document.getElementById("sort-select");
 
-  // ✅ Add safety check
-  if (!searchInput || !searchButton || !cardDisplay) {
+
+  if (!searchInput || !cardDisplay) {
     console.error("Required HTML elements not found:", {
       searchInput: !!searchInput,
-      searchButton: !!searchButton,
       cardDisplay: !!cardDisplay,
     });
-    return; // Stop execution if elements missing
+    return;
   }
 
   window.currentCards = [];
 
-  if (sortSelect) {
-    sortSelect.addEventListener("change", () => {
-      if (window.currentCards.length > 0) {
-        const sortedCards = sortCards(window.currentCards, sortSelect.value);
-        displayCards(sortedCards);
-      }
-    });
-  }
-
-  searchButton.addEventListener("click", async () => {
+  const performSearch = async () => {
     const searchTerm = searchInput.value.trim();
     if (!searchTerm) {
-      alert(`Please enter a search term.`);
+      alert("Please enter a search term.");
       return;
     }
 
-    console.log(`Searching for ${searchTerm}...`);
-
-    //loading state
     const loader = document.getElementById("pokeball-loader");
-    searchButton.disabled = true;
-    searchButton.textContent = "Searching...";
     if (loader) loader.classList.add("active");
     cardDisplay.innerHTML = "";
 
     try {
-      //update searchTerms with user input
       searchTerms.name = searchTerm;
-      searchTerms.page = 0; //reset to first page
+      searchTerms.page = 0;
 
       const result = await searchForCards(10);
 
-      if (result && result.data && result.data.length > 0) {
-        console.log(`Found ${result.data.length} cards.`);
+      if (result?.data?.length > 0) {
         window.currentCards = result.data;
-
         const sortedCards = sortSelect
           ? sortCards(window.currentCards, sortSelect.value)
           : window.currentCards;
@@ -320,24 +314,29 @@ document.addEventListener("DOMContentLoaded", async () => {
         window.currentCards = [];
       }
     } catch (error) {
-      console.error(`Error searching for cards:`, error);
+      console.error("Error searching:", error);
       cardDisplay.innerHTML =
-        "<p>Error searching for cards please try again.</p>";
-      window.currentCards = [];
+        "<p>Error searching for cards. Please try again.</p>";
     } finally {
-      //reset button state
-      searchButton.disabled = false;
-      searchButton.textContent = "Search Cards";
       if (loader) loader.classList.remove("active");
       searchTerms.name = "";
     }
-  });
+  };
 
-  searchInput.addEventListener(`keypress`, (event) => {
-    if (event.key === `Enter`) {
-      searchButton.click();
+  searchInput.addEventListener("keypress", (event) => {
+    if (event.key === "Enter") {
+      performSearch();
     }
   });
+
+  if (sortSelect) {
+    sortSelect.addEventListener("change", () => {
+      if (window.currentCards.length > 0) {
+        const sortedCards = sortCards(window.currentCards, sortSelect.value);
+        displayCards(sortedCards);
+      }
+    });
+  }
 });
 
 const buildGradedPricesHTML = (gradedPrices, exchangeRate) => {
@@ -345,7 +344,6 @@ const buildGradedPricesHTML = (gradedPrices, exchangeRate) => {
 
   let html = '<div class="graded-prices"><strong>Graded Prices:</strong><br>';
 
-  // PSA Grades
   if (gradedPrices.psa) {
     html += '<div class="grading-company-section">';
     html += '<span class="grading-company">PSA:</span> ';
@@ -356,7 +354,6 @@ const buildGradedPricesHTML = (gradedPrices, exchangeRate) => {
     html += "</div>";
   }
 
-  // BGS Grades
   if (gradedPrices.bgs) {
     html += '<div class="grading-company-section">';
     html += '<span class="grading-company">BGS:</span> ';
@@ -373,7 +370,6 @@ const buildGradedPricesHTML = (gradedPrices, exchangeRate) => {
   return html;
 };
 
-// ✅ Define this function BEFORE displayCards
 function attachWishlistHandlers() {
   const buttons = document.querySelectorAll(
     "[data-wishlist-btn]:not(.in-wishlist)",
@@ -409,7 +405,7 @@ function attachWishlistHandlers() {
 
       console.log("Card found:", card);
 
-      // ✅ Map card data
+      // Map card data
       const wishlistCard = {
         id: card.id,
         name: card.name,
@@ -484,45 +480,18 @@ function attachWishlistHandlers() {
 
 const displayCards = (cards) => {
   const cardDisplay = document.getElementById("card-display-tests");
+  cardDisplay.innerHTML = ""; 
 
-  if (!cardDisplay) {
-    console.error("Card display element not found.");
-    return;
-  }
-  cardDisplay.innerHTML = "";
-
-  // ✅ Store reference to cards globally for wishlist functionality
-  window.currentDisplayedCards = cards;
+  const fragment = document.createDocumentFragment();
 
   cards.forEach((card) => {
     const cardDiv = document.createElement("div");
     cardDiv.className = "card-item";
-
-    // Raw prices
-    const cardmarketPriceEUR = card.prices?.cardmarket?.lowest_near_mint;
-    const tcgPlayerPriceEUR = card.prices?.tcg_player?.market_price;
-
-    // Convert to USD
-    const cardmarketPriceUSD = cardmarketPriceEUR
-      ? (cardmarketPriceEUR * EUR_TO_USD).toFixed(2)
-      : null;
-    const tcgPlayerPriceUSD = tcgPlayerPriceEUR
-      ? (tcgPlayerPriceEUR * EUR_TO_USD).toFixed(2)
-      : null;
-
-    // Get graded prices HTML
-    const gradedHTML = buildGradedPricesHTML(
-      card.prices?.cardmarket?.graded,
-      EUR_TO_USD,
-    );
-
-    // ✅ Check if card is in wishlist
-    const inWishlist =
-      typeof wishlistManager !== "undefined" &&
-      wishlistManager.isInWishlist(card.id);
-
+    const inWishlist = wishlistManager.isInWishlist(card.id);
+    const cardmarketPrice = (card.prices?.cardmarket?.lowest_near_mint || 0) * EUR_TO_USD;
+    const tcgplayerPrice = (card.prices?.tcg_player?.market_price || 0) * EUR_TO_USD;
     cardDiv.innerHTML = `
-        <img src="${card.image}" alt="${card.name}" loading="lazy" />
+        <img src="" data-src="${card.image}" alt="${card.name}" loading="lazy" />
         <h3>${card.name}</h3>
         <p class="card-set">${card.episode?.name || "Unknown"}</p>
         <p class="card-number">Card #${card.card_number}</p>
@@ -530,10 +499,10 @@ const displayCards = (cards) => {
         <div class="card-pricing">
           <p class="card-price">
             <strong>Raw Prices:</strong><br>
-            Cardmarket: $${cardmarketPriceUSD || "N/A"}<br>
-            TCGPlayer: $${tcgPlayerPriceUSD || "N/A"}
+            Cardmarket: $${cardmarketPrice.toFixed(2) || "N/A"}<br>
+            TCGPlayer: $${tcgplayerPrice.toFixed(2) || "N/A"}
           </p>
-          ${gradedHTML}
+          ${buildGradedPricesHTML(card.prices?.cardmarket?.graded, EUR_TO_USD)}
         </div>
         <button 
           class="btn-wishlist ${inWishlist ? "in-wishlist" : ""}" 
@@ -544,115 +513,93 @@ const displayCards = (cards) => {
         </button>
         `;
 
-    cardDisplay.appendChild(cardDiv);
+    fragment.appendChild(cardDiv);
   });
 
-  // ✅ Add click handlers after DOM is updated
-  setTimeout(() => {
-    attachWishlistHandlers();
-  }, 100);
+  
+  cardDisplay.appendChild(fragment);
+  window.currentDisplayedCards = cards;
+  lazyLoadImages();
+  attachWishlistHandlers();
 };
 
-document
-  .querySelectorAll("[data-wishlist-btn]:not(.in-wishlist)")
-  .forEach((btn) => {
-    btn.addEventListener("click", (e) => {
-      const cardId = e.target.dataset.cardId;
-      const card = cards.find((c) => c.id === cardId);
-
-      if (card && wishlistManager) {
-        console.log("Adding card to wishlist:", card); // Debug log
-
-        // ✅ Map your API card format to the format wishlist expects
-        const wishlistCard = {
-          id: card.id,
-          name: card.name,
-          images: {
-            small: card.image,
-            large: card.image,
-          },
-          set: {
-            name: card.episode?.name || "Unknown Set",
-            id: card.episode?.id || "",
-          },
-          number: card.card_number,
-          rarity: card.rarity || "Unknown",
-          types: card.types || [],
-          supertype: card.supertype || "Pokémon",
-          tcgplayer: {
-            prices: {
-              normal: {
-                market: parseFloat(tcgPlayerPriceUSD) || 0,
-              },
-            },
-          },
-          cardmarket: {
-            prices: {
-              averageSellPrice: parseFloat(cardmarketPriceUSD) || 0,
-            },
-          },
-        };
-
-        const success = wishlistManager.addCard(wishlistCard);
-
-        if (success) {
-          // Update button state immediately
-          e.target.textContent = "✓ In Wishlist";
-          e.target.classList.add("in-wishlist");
-          e.target.disabled = true;
+const lazyLoadImages = () => {
+  const images = document.querySelectorAll("img[data-src]");
+  
+  if ("IntersectionObserver" in window) {
+    const imageObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          img.src = img.dataset.src;
+          img.removeAttribute("data-src");
+          imageObserver.unobserve(img);
         }
-      } else if (typeof wishlistManager === "undefined") {
-        console.error("WishListManager is not defined.");
-        alert(
-          "Wishlist feature is not available. Please refresh the page or try again later.",
-        );
-      }
+      });
     });
-  });
+    images.forEach((img) => imageObserver.observe(img));
+  } else {
+    images.forEach((img) => {
+      img.src = img.dataset.src;
+      img.removeAttribute("data-src");
+    });
+  }
+};
 
 const getAllExpansions = async () => {
+
+  const cached = localStorage.getItem("expansions_cache");
+  const cachedTime = localStorage.getItem("expansions_cache_time");
+
+  if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000) {
+    console.log("Using cached expansions data");
+    return JSON.parse(cached);
+  }
+
   let allExpansions = [];
+  const seenIds = new Set();
+  const pageSize = 250;
   let page = 0;
   let hasMorePages = true;
-  const seenIds = new Set();
+
+  console.log("Fetching fresh expansions from API...");
 
   try {
     while (hasMorePages) {
-      const url = `https://pokemon-tcg-api.p.rapidapi.com/episodes?page=${page}`;
+      const url = `https://pokemon-tcg-api.p.rapidapi.com/episodes?page=${page}&pageSize=${pageSize}`;
+      
+      console.log(`Fetching page ${page} with pageSize ${pageSize}`);
       const response = await fetch(url, options);
       const result = await response.json();
 
       if (result.data && result.data.length > 0) {
         const uniqueExpansions = result.data.filter((exp) => {
-          if (seenIds.has(exp.id)) {
-            return false;
-          }
+          if (seenIds.has(exp.id)) return false;
           seenIds.add(exp.id);
           return true;
         });
 
         allExpansions.push(...uniqueExpansions);
-
-        if (result.paging) {
-          hasMorePages = page < result.paging.total - 1;
-        } else {
-          hasMorePages = false;
-        }
+        console.log(`Page ${page}: Added ${uniqueExpansions.length} expansions (Total: ${allExpansions.length})`);
+        
+        
+        hasMorePages = result.paging && page < result.paging.total - 1;
       } else {
         hasMorePages = false;
       }
 
       page++;
-
-      if (page > 50) {
-        console.warn("Reached page limit, stopping");
-        break;
-      }
+      if (page > 50) break; 
     }
+
+    
+    localStorage.setItem("expansions_cache", JSON.stringify(allExpansions));
+    localStorage.setItem("expansions_cache_time", Date.now());
+    console.log(`Cached ${allExpansions.length} expansions for 7 days`);
 
     return allExpansions;
   } catch (err) {
-    console.error(`❌ Error fetching expansions:`, err);
+    console.error("Error fetching expansions:", err);
     return allExpansions;
   }
 };
@@ -670,7 +617,7 @@ const groupExpansionsBySeries = (expansions) => {
     const expandedKey = `${expansion.name}-${expansion.code}`;
 
     if (seenNames[expandedKey]) {
-      return; // Skip duplicates silently
+      return; 
     }
 
     seenNames[expandedKey] = true;
@@ -688,7 +635,7 @@ const buildDrawerContent = (groupExpansions) => {
   let html = "";
 
   Object.entries(groupExpansions).forEach(([seriesName, expansions]) => {
-    const seriesId = seriesName.replace(/\s+/g, "-");
+    const seriesId = seriesName.replace(SERIES_ID_REGEX, "-");
 
     const sortedExpansions = [...expansions].sort((a, b) => {
       const dateA = new Date(a.released_at || "1996-01-01");
@@ -778,7 +725,7 @@ const sortCards = (cards, sortType) => {
   }
 };
 
-// drawer functionality
+
 const initializeDrawer = async () => {
   const drawerOverlay = document.getElementById("drawer-overlay");
   const filterDrawer = document.getElementById("filter-drawer");
@@ -887,4 +834,4 @@ const initializeDrawer = async () => {
   });
 };
 
-// debugging
+

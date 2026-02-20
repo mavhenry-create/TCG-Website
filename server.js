@@ -4,17 +4,31 @@ const bcrypt = require("bcrypt");
 const { Pool } = require("pg");
 const session = require("express-session");
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const crypto = require("crypto");
 require("dotenv").config();
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: process.env.DB_PORT || 5432,
-});
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false },
+      }
+    : {
+        user: process.env.DB_USER,
+        host: process.env.DB_HOST,
+        database: process.env.DB_NAME,
+        password: process.env.DB_PASSWORD,
+        port: process.env.DB_PORT || 5432,
+      },
+);
+
+// ✅ ADD STATIC FILE SERVING FIRST
+app.use(express.static(path.join(__dirname)));
+app.use("/CSS", express.static(path.join(__dirname, "CSS")));
+app.use("/HTML", express.static(path.join(__dirname, "HTML")));
+app.use("/JavaScript", express.static(path.join(__dirname, "JavaScript")));
+app.use("/pictures", express.static(path.join(__dirname, "pictures")));
 
 // Add body parser middleware
 app.use(express.json());
@@ -29,13 +43,10 @@ app.use(
   }),
 );
 
-// Serve static files from the root directory
-app.use(express.static(__dirname));
-
-// Serve HTML files
-app.use("/HTML", express.static(path.join(__dirname, "HTML")));
-app.use("/JavaScript", express.static(path.join(__dirname, "JavaScript")));
-app.use("/pictures", express.static(path.join(__dirname, "pictures")));
+// ✅ ADD FAVICON ROUTE
+app.get("/favicon.ico", (req, res) => {
+  res.status(204).end();
+});
 
 // Route for the home page
 app.get("/", (req, res) => {
@@ -238,50 +249,64 @@ app.post("/api/wishlist/compare", (req, res) => {
 
         const friendId = result.rows[0].id;
 
-        // Get current user's wishlist - fetch full card data
         pool.query(
-          "SELECT id, name FROM wishlist WHERE user_id = $1",
-          [req.session.userId],
-          (err1, myWishlist) => {
-            if (err1) {
-              console.error("Error:", err1);
+          "SELECT username FROM users WHERE id = $1",
+          [friendId],
+          (err0, userResult) => {
+            if (err0 || !userResult.rows[0]) {
               return res.status(500).json({ success: false });
             }
 
-            // Get friend's wishlist
+            const friendUsername = userResult.rows[0].username;
+
+            // ✅ ADD imagelarge, imagesmall, setname, number columns
             pool.query(
-              "SELECT id, name FROM wishlist WHERE user_id = $1",
-              [friendId],
-              (err2, friendWishlist) => {
-                if (err2) {
-                  console.error("Error:", err2);
+              "SELECT id, name, imagelarge, imagesmall, setname, number FROM wishlist WHERE user_id = $1",
+              [req.session.userId],
+              (err1, myWishlist) => {
+                if (err1) {
+                  console.error("Error:", err1);
                   return res.status(500).json({ success: false });
                 }
 
-                const myCardIds = new Set(myWishlist.rows.map((r) => r.id));
-                const friendCardIds = new Set(
-                  friendWishlist.rows.map((r) => r.id),
+                // ✅ ADD imagelarge, imagesmall, setname, number columns
+                pool.query(
+                  "SELECT id, name, imagelarge, imagesmall, setname, number FROM wishlist WHERE user_id = $1",
+                  [friendId],
+                  (err2, friendWishlist) => {
+                    if (err2) {
+                      console.error("Error:", err2);
+                      return res.status(500).json({ success: false });
+                    }
+
+                    const myCardIds = new Set(myWishlist.rows.map((r) => r.id));
+                    const friendCardIds = new Set(
+                      friendWishlist.rows.map((r) => r.id),
+                    );
+
+                    const matchingCount = [...myCardIds].filter((id) =>
+                      friendCardIds.has(id),
+                    ).length;
+                    const onlyYouHave = [...myCardIds].filter(
+                      (id) => !friendCardIds.has(id),
+                    ).length;
+                    const onlyTheyHave = [...friendCardIds].filter(
+                      (id) => !myCardIds.has(id),
+                    ).length;
+
+                    res.json({
+                      success: true,
+                      comparison: {
+                        matchingCount,
+                        onlyYouHave,
+                        onlyTheyHave,
+                        friendUsername,
+                        myCards: myWishlist.rows, // ✅ NOW HAS IMAGES
+                        friendCards: friendWishlist.rows, // ✅ NOW HAS IMAGES
+                      },
+                    });
+                  },
                 );
-
-                const matchingCount = [...myCardIds].filter((id) =>
-                  friendCardIds.has(id),
-                ).length;
-                const onlyYouHave = [...myCardIds].filter(
-                  (id) => !friendCardIds.has(id),
-                ).length;
-                const onlyTheyHave = [...friendCardIds].filter(
-                  (id) => !myCardIds.has(id),
-                ).length;
-
-                res.json({
-                  success: true,
-                  comparison: { matchingCount,
-                  onlyYouHave,
-                  onlyTheyHave,
-                  friendUsername,
-                  myCards: decorate(myWishlist.rows, friendCardIds),
-                  friendCards: decorate(friendWishlist.rows, myCardIds),},
-                });
               },
             );
           },
@@ -626,5 +651,5 @@ app.delete("/api/budget/:id", (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Server is running on port ${PORT}`);
 });
