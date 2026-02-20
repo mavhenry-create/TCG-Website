@@ -23,44 +23,21 @@ const pool = new Pool(
       },
 );
 
-// ✅ ADD STATIC FILE SERVING FIRST
+// ✅ STATIC FILES MUST BE HERE (BEFORE ROUTES)
 app.use(express.static(path.join(__dirname)));
 app.use("/CSS", express.static(path.join(__dirname, "CSS")));
 app.use("/HTML", express.static(path.join(__dirname, "HTML")));
 app.use("/JavaScript", express.static(path.join(__dirname, "JavaScript")));
 app.use("/pictures", express.static(path.join(__dirname, "pictures")));
 
-// Add body parser middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  session({
-    secret: process.env.SESSION_SECRET,
-    resave: false,
-    saveUninitialized: false,
-    cookie: { secure: false }, // Set to true if using HTTPS
-  }),
-);
-
-// ✅ ADD FAVICON ROUTE
 app.get("/favicon.ico", (req, res) => {
   res.status(204).end();
 });
 
-// Route for the home page
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "HTML", "TCG-home.html"));
-});
-
-app.get("/api/config", (req, res) => {
-  res.json({
-    rapidApiKey: process.env.RAPIDAPI_KEY,
-    rapidApiHost: process.env.RAPIDAPI_HOST,
-  });
-});
-
-// Login endpoint
+// ✅ THEN YOUR ROUTES COME AFTER
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
 
@@ -97,6 +74,13 @@ app.post("/api/login", async (req, res) => {
     console.error("Login error:", error);
     res.status(500).json({ success: false, message: "Server error" });
   }
+});
+
+app.get("/api/config", (req, res) => {
+  res.json({
+    rapidApiKey: process.env.RAPIDAPI_KEY,
+    rapidApiHost: process.env.RAPIDAPI_HOST,
+  });
 });
 
 app.get("/api/user", (req, res) => {
@@ -651,5 +635,5 @@ app.delete("/api/budget/:id", (req, res) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
