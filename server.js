@@ -23,6 +23,15 @@ const pool = new Pool(
       },
 );
 
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET || "your-secret-key",
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, httpOnly: true }, // Set secure: true in production with HTTPS
+  })
+);
+
 // ✅ STATIC FILES MUST BE HERE (BEFORE ROUTES)
 app.use(express.static(path.join(__dirname)));
 app.use("/CSS", express.static(path.join(__dirname, "CSS")));
