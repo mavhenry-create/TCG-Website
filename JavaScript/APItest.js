@@ -44,11 +44,10 @@ const searchTerms = {
 const buildSearchUrl = (terms) => {
   const params = new URLSearchParams();
   Object.entries(terms).forEach(([key, val]) => {
-        if (val !== "" && val !== 0) params.append(key, val);
-      });
-      return `${BASE_URL}/search?${params.toString()}`;
+    if (val !== "" && val !== 0) params.append(key, val);
+  });
+  return `${BASE_URL}/search?${params.toString()}`;
 };
-
 
 const searchForCards = async (maxPages = 6) => {
   const allCards = [];
@@ -81,9 +80,7 @@ const searchForCards = async (maxPages = 6) => {
         });
 
         allCards.push(...uniqueCards);
-        console.log(
-          `Total unique cards collected so far: ${allCards.length}`,
-        );
+        console.log(`Total unique cards collected so far: ${allCards.length}`);
 
         if (!result.paging || currentPage >= result.paging.total - 1) {
           console.log(`Stopping: No more pages available`);
@@ -107,12 +104,15 @@ const searchForCards = async (maxPages = 6) => {
 };
 
 const listCardsByExpansion = async (episodeId, maxPages = 20) => {
- 
   const cacheKey = `expansion_${episodeId}`;
   const cached = localStorage.getItem(cacheKey);
   const cachedTime = localStorage.getItem(`${cacheKey}_time`);
 
-  if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000) {
+  if (
+    cached &&
+    cachedTime &&
+    Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000
+  ) {
     console.log(`Using cached cards for expansion ${episodeId}`);
     return JSON.parse(cached);
   }
@@ -202,7 +202,9 @@ const listCardsByExpansion = async (episodeId, maxPages = 20) => {
 
   localStorage.setItem(cacheKey, JSON.stringify(result));
   localStorage.setItem(`${cacheKey}_time`, Date.now());
-  console.log(`✅ Cached ${allCards.length} cards for expansion ${episodeId} for 7 days`);
+  console.log(
+    `✅ Cached ${allCards.length} cards for expansion ${episodeId} for 7 days`,
+  );
 
   console.log(
     `FINAL: ${allCards.length} unique cards from pages fetched for expansion ${episodeId}`,
@@ -246,7 +248,7 @@ let currentCurrency = "USD";
 const fetchExchangeRate = async () => {
   const cached = localStorage.getItem("EUR_TO_USD");
   const cachedTime = localStorage.getItem("EUR_TO_USD_TIME");
-  
+
   if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 86400000) {
     EUR_TO_USD = parseFloat(cached);
     console.log(`Using cached rate: 1 EUR = ${EUR_TO_USD} USD`);
@@ -254,7 +256,9 @@ const fetchExchangeRate = async () => {
   }
 
   try {
-    const response = await fetch("https://api.exchangerate-api.com/v4/latest/EUR");
+    const response = await fetch(
+      "https://api.exchangerate-api.com/v4/latest/EUR",
+    );
     const data = await response.json();
     EUR_TO_USD = data.rates.USD;
     localStorage.setItem("EUR_TO_USD", EUR_TO_USD);
@@ -266,7 +270,7 @@ const fetchExchangeRate = async () => {
 };
 
 document.addEventListener("DOMContentLoaded", async () => {
-  await loadApiConfig(); 
+  await loadApiConfig();
 
   fetchExchangeRate();
   initializeDrawer();
@@ -274,7 +278,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const searchInput = document.getElementById("card-search-input");
   const cardDisplay = document.getElementById("card-display-tests");
   const sortSelect = document.getElementById("sort-select");
-
 
   if (!searchInput || !cardDisplay) {
     console.error("Required HTML elements not found:", {
@@ -480,7 +483,7 @@ function attachWishlistHandlers() {
 
 const displayCards = (cards) => {
   const cardDisplay = document.getElementById("card-display-tests");
-  cardDisplay.innerHTML = ""; 
+  cardDisplay.innerHTML = "";
 
   const fragment = document.createDocumentFragment();
 
@@ -488,8 +491,10 @@ const displayCards = (cards) => {
     const cardDiv = document.createElement("div");
     cardDiv.className = "card-item";
     const inWishlist = wishlistManager.isInWishlist(card.id);
-    const cardmarketPrice = (card.prices?.cardmarket?.lowest_near_mint || 0) * EUR_TO_USD;
-    const tcgplayerPrice = (card.prices?.tcg_player?.market_price || 0) * EUR_TO_USD;
+    const cardmarketPrice =
+      (card.prices?.cardmarket?.lowest_near_mint || 0) * EUR_TO_USD;
+    const tcgplayerPrice =
+      (card.prices?.tcg_player?.market_price || 0) * EUR_TO_USD;
     cardDiv.innerHTML = `
         <img src="" data-src="${card.image}" alt="${card.name}" loading="lazy" />
         <h3>${card.name}</h3>
@@ -516,7 +521,6 @@ const displayCards = (cards) => {
     fragment.appendChild(cardDiv);
   });
 
-  
   cardDisplay.appendChild(fragment);
   window.currentDisplayedCards = cards;
   lazyLoadImages();
@@ -525,7 +529,7 @@ const displayCards = (cards) => {
 
 const lazyLoadImages = () => {
   const images = document.querySelectorAll("img[data-src]");
-  
+
   if ("IntersectionObserver" in window) {
     const imageObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
@@ -547,11 +551,14 @@ const lazyLoadImages = () => {
 };
 
 const getAllExpansions = async () => {
-
   const cached = localStorage.getItem("expansions_cache");
   const cachedTime = localStorage.getItem("expansions_cache_time");
 
-  if (cached && cachedTime && Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000) {
+  if (
+    cached &&
+    cachedTime &&
+    Date.now() - parseInt(cachedTime) < 7 * 24 * 60 * 60 * 1000
+  ) {
     console.log("Using cached expansions data");
     return JSON.parse(cached);
   }
@@ -567,7 +574,7 @@ const getAllExpansions = async () => {
   try {
     while (hasMorePages) {
       const url = `https://pokemon-tcg-api.p.rapidapi.com/episodes?page=${page}&pageSize=${pageSize}`;
-      
+
       console.log(`Fetching page ${page} with pageSize ${pageSize}`);
       const response = await fetch(url, options);
       const result = await response.json();
@@ -580,19 +587,19 @@ const getAllExpansions = async () => {
         });
 
         allExpansions.push(...uniqueExpansions);
-        console.log(`Page ${page}: Added ${uniqueExpansions.length} expansions (Total: ${allExpansions.length})`);
-        
-        
+        console.log(
+          `Page ${page}: Added ${uniqueExpansions.length} expansions (Total: ${allExpansions.length})`,
+        );
+
         hasMorePages = result.paging && page < result.paging.total - 1;
       } else {
         hasMorePages = false;
       }
 
       page++;
-      if (page > 50) break; 
+      if (page > 50) break;
     }
 
-    
     localStorage.setItem("expansions_cache", JSON.stringify(allExpansions));
     localStorage.setItem("expansions_cache_time", Date.now());
     console.log(`Cached ${allExpansions.length} expansions for 7 days`);
@@ -617,7 +624,7 @@ const groupExpansionsBySeries = (expansions) => {
     const expandedKey = `${expansion.name}-${expansion.code}`;
 
     if (seenNames[expandedKey]) {
-      return; 
+      return;
     }
 
     seenNames[expandedKey] = true;
@@ -725,7 +732,6 @@ const sortCards = (cards, sortType) => {
   }
 };
 
-
 const initializeDrawer = async () => {
   const drawerOverlay = document.getElementById("drawer-overlay");
   const filterDrawer = document.getElementById("filter-drawer");
@@ -740,6 +746,51 @@ const initializeDrawer = async () => {
     console.error("Drawer elements not found.");
     return;
   }
+
+  const closeDrawer = () => {
+    drawerOverlay.classList.remove("show");
+    filterDrawer.classList.remove("open");
+  };
+
+  const attachSetClickHandlers = () => {
+    const setLabels = document.querySelectorAll(".set-label");
+    setLabels.forEach((label) => {
+      label.addEventListener("click", async (e) => {
+        if (e.target.classList.contains("set-checkbox")) {
+          return;
+        }
+        const checkbox = label.querySelector(".set-checkbox");
+        const episodeId = checkbox.value;
+        const setName = label.querySelector(".set-name").textContent;
+
+        const cardDisplay = document.getElementById("card-display-tests");
+        const loader = document.getElementById("pokeball-loader");
+        if (loader) loader.classList.add("active");
+        cardDisplay.innerHTML = "";
+
+        try {
+          const result = await listCardsByExpansion(episodeId);
+
+          if (result && result.data && result.data.length > 0) {
+            window.currentCards = result.data;
+            const sortedCards = sortSelect
+              ? sortCards(result.data, sortSelect.value)
+              : result.data;
+            displayCards(sortedCards);
+          } else {
+            cardDisplay.innerHTML = `<p>No cards found for ${setName}.</p>`;
+            window.currentCards = [];
+          }
+          closeDrawer();
+        } catch (error) {
+          console.error("Error loading set:", error);
+          cardDisplay.innerHTML = `<p>Error loading cards for ${setName}. Please try again.</p>`;
+        } finally {
+          if (loader) loader.classList.remove("active");
+        }
+      });
+    });
+  };
 
   openFilterBtn.addEventListener("click", async () => {
     drawerOverlay.classList.add("show");
@@ -769,13 +820,9 @@ const initializeDrawer = async () => {
           }
         }
       });
+      attachSetClickHandlers();
     }
   });
-
-  const closeDrawer = () => {
-    drawerOverlay.classList.remove("show");
-    filterDrawer.classList.remove("open");
-  };
 
   drawerCloseBtn.addEventListener("click", closeDrawer);
   drawerOverlay.addEventListener("click", closeDrawer);
@@ -833,5 +880,3 @@ const initializeDrawer = async () => {
     });
   });
 };
-
-
